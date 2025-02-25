@@ -327,7 +327,7 @@ static float scan_float(char* start, char* end, int arg2) {
         if (end[-1] != 0) {
             *end = 0;
         }
-        return str_to_float(start, arg2, 1);
+        return str_to_float(start, arg2, LEVEL_WARNING);
     }
 }
 
@@ -336,7 +336,7 @@ static double scan_double(char* start, char* end, int arg2) {
         if (end[-1] != 0) {
             *end = 0;
         }
-        return str_to_double(start, arg2, 1);
+        return str_to_double(start, arg2, LEVEL_WARNING);
     }
 }
 

@@ -1926,7 +1926,7 @@ float cvt_float_const(TreeNode* arg0) {
     
     savedCtx = tree_handle;
     tree_handle = general_handle;
-    REALCONSTANT(arg0).value->constVal = make(Constant_special, TREE_LOCATION(arg0), float_type, value = str_to_float(REALCONSTANT(arg0).value->name, TREE_LOCATION(arg0), 4));
+    REALCONSTANT(arg0).value->constVal = make(Constant_special, TREE_LOCATION(arg0), float_type, value = str_to_float(REALCONSTANT(arg0).value->name, TREE_LOCATION(arg0), LEVEL_SUPPRESSED));
     tree_handle = savedCtx;
     return value;
 }
@@ -1938,7 +1938,7 @@ double cvt_double_const(TreeNode* arg0) {
 
     savedCtx = tree_handle;
     tree_handle = general_handle;
-    REALCONSTANT(arg0).value->constVal = make(Constant_special, TREE_LOCATION(arg0), double_type, value = str_to_double(REALCONSTANT(arg0).value->name, TREE_LOCATION(arg0), 4));
+    REALCONSTANT(arg0).value->constVal = make(Constant_special, TREE_LOCATION(arg0), double_type, value = str_to_double(REALCONSTANT(arg0).value->name, TREE_LOCATION(arg0), LEVEL_SUPPRESSED));
     tree_handle = savedCtx;
     return value;
 }

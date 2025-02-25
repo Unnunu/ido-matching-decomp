@@ -85,6 +85,7 @@
 #define TERNARY_EXPR(t) (*((TreeNode_Ternary_expr*)t))
 #define AGGREGATE_EXPR(t) (*((TreeNode_Aggregate_expr*)t))
 #define ICONSTANT(t) (*((TreeNode_IConstant*)t))
+#define ICONSTANT2(t) (*((TreeNode_IConstant2*)t))
 #define UICONSTANT(t) (*((TreeNode_UIConstant*)t))
 #define FLTCONSTANT(t) (*((TreeNode_FltConstant*)t))
 #define DBLCONSTANT(t) (*((TreeNode_DblConstant*)t))
@@ -102,6 +103,9 @@
         t == ulong_type || t == ulonglong_type || t == ushort_type || \
         t == label_type || t == void_type || t == any_type || \
         t == int32_type || t == uint32_type || t == int64_type || t == uint64_type)
+
+#define IS_SIGNED_TYPE(type) (TREE_CODE(type) >= Char_type && TREE_CODE(type) <= Signed_type || TREE_CODE(type) == Enum_type)
+#define IS_64BIT_TYPE(type) ((TREE_CODE(type) == Enum_type || TREE_CODE(type) >= Char_type && TREE_CODE(type) <= Ushort_type) && BASIC_TYPE(type).size == 64)
 
 enum TreeCodes {
     Identifier,
