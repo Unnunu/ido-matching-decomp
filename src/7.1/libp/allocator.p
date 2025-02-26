@@ -212,6 +212,8 @@ begin
     return(1);
   end {function alloc_next_scb};
 
+
+{ NON_MATCHING !!! }
 function alloc_resize; { (fptr : pointer; fsize : cardinal; var fheap : pointer): pointer }
 var
     nptr : bcbp;

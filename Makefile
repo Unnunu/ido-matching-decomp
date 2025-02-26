@@ -94,7 +94,7 @@ MIPS_VERSION := -mips2
 ASFLAGS := -march=vr4300 -32 -Iinclude -KPIC
 
 IDO_WARNINGS := -fullwarn -woff 624,649,838,712,835
-CFLAGS += -G 0 -KPIC -Xcpluscomm $(IINC) -nostdinc -Wab,-r4300_mul $(IDO_WARNINGS)
+CFLAGS += -G 0 -Xcpluscomm $(IINC) -nostdinc -Wab,-r4300_mul $(IDO_WARNINGS)
 
 
 # -- Location of original IDO binaries
@@ -111,6 +111,7 @@ ASM_DIRS := $(shell find asm/$(VERSION) -type d -not -path "asm/$(VERSION)/funct
 
 C_FILES  := $(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.c))
 P_FILES  := $(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.p)) # Pascal files
+SRC_S_FILES  := $(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.s)) # handwritten asm
 
 S_FILES  := $(foreach dir,$(ASM_DIRS),$(wildcard $(dir)/*.s))
 COMBINED_S_FILES := $(sort $(foreach file, $(S_FILES:.s=), $(basename $(file))))
@@ -119,6 +120,7 @@ Y_FILES  := $(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.y))
 
 O_FILES  := $(foreach f,$(Y_FILES:.y=.o),$(BUILD)/$(f)) \
 			$(foreach f,$(C_FILES:.c=.o),$(BUILD)/$(f)) \
+			$(foreach f,$(SRC_S_FILES:.s=.o),$(BUILD)/$(f)) \
             $(foreach f,$(P_FILES:.p=.o),$(BUILD)/$(f)) \
             $(foreach f,$(COMBINED_S_FILES),$(BUILD)/$(f).o)
 
@@ -179,6 +181,9 @@ $(BUILD)/%.o: %.c
 	$(CC) -c $(CFLAGS) $(MIPS_VERSION) $(OPTFLAGS) -o $@ $<
 
 $(BUILD)/%.o: %.p
+	$(CC) -c $(CFLAGS) $(MIPS_VERSION) $(OPTFLAGS) -o $@ $<
+
+$(BUILD)/%.o: %.s
 	$(CC) -c $(CFLAGS) $(MIPS_VERSION) $(OPTFLAGS) -o $@ $<
 
 %.c: %.y
