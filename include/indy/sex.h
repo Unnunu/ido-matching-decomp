@@ -46,7 +46,7 @@ extern "C" {
 		      (((a) >> 8) & 0x0000ff00) | \
 	((unsigned long)(a) >>24) )
 
-#define swap_half(a) ( ((a & 0xff) << 8) | ((unsigned short)(a) >> 8) )
+#define swap_half(a) ( ((a & 0xff) << 8) | ((unsigned)(unsigned short)(a) >> 8) )
 
 struct aouthdr;
 struct fdr;

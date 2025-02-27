@@ -32,7 +32,7 @@ def main():
         libs = ()
     elif version == "7.1":
         programs = ("as1", "cfe", "cc", "ugen")
-        libs = ("libp",)
+        libs = ("libp", "mld")
     else:
         print("Version unrecognized")
         sys.exit(1)
