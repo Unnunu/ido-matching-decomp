@@ -1,5 +1,8 @@
 #define ptradd(_type, _ptr, _offset) _type(ord(_ptr) + (_offset))
 
+type
+    pointer = cardinal;
+
 #include "cmplrs/mipspascal.h"
 #include "cmplrs/allocator.h"
 
@@ -123,7 +126,7 @@ begin
         q^.last_scb := p;
     end;
 
-    fheap := q;
+    fheap := ord(q);
     q^.scb_size := abs(q^.scb_size);
 
     r := q^.free_list;
@@ -163,7 +166,7 @@ begin
     r := q^.last_scb;
     if r <> nil then r^.next_scb := nil;
     while (r <> nil) and (r^.scb_size < 0) do r := r^.last_scb;
-    fheap := r;
+    fheap := ord(r);
 
     {-------------------------------------------------------------------------}
     { free all the scb's from the mark until the end of the list              }
@@ -220,7 +223,7 @@ var
     csize : integer;
 
 begin
-    if fptr <> nil then begin
+    if fptr <> 0 then begin
         nptr := ptradd(bcbp, fptr, -8);
         if bitand(nptr^.curr_size, curr_allocated) = 0 then return(pointer(nil));
         csize := bitand(nptr^.curr_size, bcb_mask);
