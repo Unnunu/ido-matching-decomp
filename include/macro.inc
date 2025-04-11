@@ -17,7 +17,6 @@
 .endm
 
 .macro jlabel label, visibility=global
-.\visibility \label
 .type \label, @object
 \label:
 .endm

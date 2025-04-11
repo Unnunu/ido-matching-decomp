@@ -27,6 +27,8 @@ type
         5: (o: ^Identname;);
         6: (c: ^char;);
     end;
+
+    PFileName = ^Filename;
     
     PBinasm = ^binasm;
     FileOfBinasm = File of binasm;
@@ -148,8 +150,8 @@ type
         { 0x3B } unk3B: boolean;
         { 0x3C } unk3C: boolean;
         { 0x3D } unk3D: boolean;
-        { 0x3D } unk3E: boolean;
-        { 0x3D } unk3F: registers;
+        { 0x3E } unk3E: boolean;
+        { 0x3F } unk3F: registers;
         { 0x40 } unk40: registers;
         { 0x44 } unk44: integer;
         { 0x48 } unk48: integer;
@@ -251,6 +253,18 @@ type
         unk_1E: boolean;
     end;
 
+    UnkFPStruct = record; { union maybe }    
+        unk_00: array [1..4] of integer;
+    end;
+
+    mips_isa = (
+        ISA_UNSPEC,
+        ISA_MIPS1,
+        ISA_MIPS2,
+        ISA_MIPS3,
+        ISA_MIPS4
+    );
+
 var
     emptystring: extern GString;
     gpreg: extern registers;
@@ -337,6 +351,7 @@ var
     asm2asmformat: extern array [first(asmcodes)..last(asmcodes)] of asmformat;
     br_likely_ops: extern set of opcodes;
     num_pseudo: extern integer;
+    isa: mips_isa;
     
 procedure ltoa(arg0: integer; arg1: ^char); external;
 procedure PostError(arg0: String; arg1: GString; arg2: ErrorLevel); external;
@@ -363,3 +378,14 @@ procedure initbb(var index: integer); external;
 procedure parseafrrr(fasm: asmcodes); external;
 procedure parseafra(fasm: asmcodes); external;
 procedure parseafri_fp(fasm: asmcodes); external;
+function get_fp_string(size: integer): PFilename; external;
+procedure string_to_fpoverlay(arg0: GString; arg1: Byte; var arg2: UnkFPStruct; var arg3: boolean; var arg4: boolean); external;
+function short_s(arg0: integer): integer; external;
+function short_d(arg0: integer; arg1: integer): integer; external;
+function generate_as_immediate(fasm: asmcodes; reg1: registers; arg2: integer; arg3: integer): boolean; external;
+function stp(symno: integer): PUnkAlpha; external;
+procedure emitalui(op: opcodes; reg1: registers; reg2: registers; imm: integer); external;
+procedure emitshift(op: opcodes; reg1: registers; reg2: registers; shift: integer); external;
+procedure _setrld(sym: PUnkAlpha; arg1: integer; arg2: integer); external;
+function disp(high: boolean; offset: cardinal): cardinal; external;
+procedure macro_error; external;

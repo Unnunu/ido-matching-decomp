@@ -31,14 +31,11 @@ procedure fill_pseudo(arg0: integer; arg1: integer; arg2: integer; arg3: integer
 procedure st_pseudo(arg0: integer; arg1: integer; arg2: integer; arg3: registers; arg4: integer; arg5: integer; arg6: integer); external; { TODO signature }
 procedure fill_ascii_pseudo(var str: st_string; size: integer; arg2: boolean); external;
 procedure get_binasm(var b: PBinasm); external;
-function stp(symno: integer): PUnkAlpha; external;
 procedure enterstp(symno: integer); external;
 procedure enterlabel(symno: integer; var sym: PUnkAlpha); external;
 procedure entersym(symno: integer; var sym: PUnkAlpha); external;
-procedure _setrld(sym: PUnkAlpha; arg1: integer; arg2: integer); external;
 procedure loadimmed(arg0: integer; arg1: registers; arg2: PUnkAlpha); external;
 procedure emitloadstore(op: opcodes; reg1: registers; offset: integer; reg2: registers); external;
-procedure emitalui(op: opcodes; reg1: registers; reg2: registers; imm: integer); external;
 procedure emitreg2(op: opcodes; reg1: registers; reg2: registers); external;
 procedure emitalu3(op: opcodes; reg1: registers; reg2: registers; reg3: registers); external;
 procedure emitfpop(op: opcodes; reg1: registers; reg2: registers; reg3: registers); external;
@@ -67,7 +64,7 @@ begin
     PostError("macro instruction used $at", emptystring, ErrorLevel_2);
 end;
 
-function disp(high: boolean; offset: cardinal): cardinal;
+function disp{(high: boolean; offset: cardinal): cardinal};
 begin
     if high then begin
         if (bitand(offset, 16#8000) <> 0) then begin

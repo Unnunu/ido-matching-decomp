@@ -34,14 +34,6 @@ type
         Reorg_Val_13
     );
 
-    mips_isa = (
-        ISA_UNSPEC,
-        ISA_MIPS1,
-        ISA_MIPS2,
-        ISA_MIPS3,
-        ISA_MIPS4
-    );
-
     options = (
         option__EB,
         option__EL,
@@ -181,7 +173,6 @@ var
     multirelocinstr_list: ARRAY_OF(integer);
     sym_tab: ARRAY_OF(PUnkALpha);
     neg_sym_tab: ARRAY_OF(PUnkALpha);
-    isa: mips_isa;
     s_pool_symbol: PUnkAlpha;
     d_pool_symbol: PUnkAlpha;
     nopinserted: integer;
