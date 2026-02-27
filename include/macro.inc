@@ -1,29 +1,49 @@
 .ifndef MACRO_INC
 .set MACRO_INC, 1
 
-.set noat
-.set noreorder
-
-.macro glabel name, visibility=global
-.\visibility \name
-.type \name, @function
-\name:
+# A function symbol (but some projects use it for everything).
+.macro glabel label, visibility=global
+    .\visibility \label
+    \label:
 .endm
 
-.macro dlabel name, visibility=global
-.\visibility \name
-.type \name, @object
-\name:
+# The end of a function symbol.
+.macro endlabel label
+    .size \label, . - \label
 .endm
 
-.macro jlabel label, visibility=global
-.\visibility \label
-.type \label, @object
-\label:
+# An alternative entry to a function.
+.macro alabel label, visibility=global
+    .\visibility \label
+    .type \label, @function
+    \label:
 .endm
 
-.macro llabel label, visibility=global
-\label:
+
+# A data symbol.
+.macro dlabel label, visibility=global
+    .\visibility \label
+    \label:
+.endm
+
+# End of a data symbol.
+.macro enddlabel label
+    .size \label, . - \label
+.endm
+
+
+# A label referenced by a jumptable.
+.macro jlabel label
+    \label:
+.endm
+
+
+# Label to signal the symbol haven't been matched yet.
+.macro nonmatching label, size=1
+    .global \label\().NON_MATCHING
+    .type \label\().NON_MATCHING, @object
+    .size \label\().NON_MATCHING, \size
+    \label\().NON_MATCHING:
 .endm
 
 # Float register aliases (o32 ABI, odd ones are rarely used)
