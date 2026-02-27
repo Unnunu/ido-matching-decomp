@@ -37,6 +37,14 @@
     \label:
 .endm
 
+.macro llabel label
+    \label:
+.endm
+
+.macro endllabel label
+    .size \label, . - \label
+.endm
+
 
 # Label to signal the symbol haven't been matched yet.
 .macro nonmatching label, size=1
