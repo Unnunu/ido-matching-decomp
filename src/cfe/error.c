@@ -8,7 +8,8 @@
 
 #include "common.h"
 
-char* ident = "$Header: /hosts/bonnie/proj/irix6.4-ssg/isms/cmplrs/targucode/cfe/RCS/error.c,v 1.9 1994/06/15 00:22:07 rdahl Exp $";
+char* ident = "$Header: /hosts/bonnie/proj/irix6.4-ssg/isms/cmplrs/targucode/cfe/RCS/error.c,v 1.9 1994/06/15 00:22:07 "
+              "rdahl Exp $";
 
 typedef struct ErrorStruct {
     /* 0x00 */ struct LinkedListEntry link;
@@ -82,21 +83,23 @@ static void get_error_message(char* buffer, int msgid, int type) {
         while (*message_files != NULL && current_mesg_file == NULL) {
             current_mesg_file = fopen(*message_files, "r");
             if (debug_arr['e'] > 0) {
-                fprintf(dbgout, "attempting to open msg file %s %s\n", *message_files, current_mesg_file != NULL ? "success" : "failed");
+                fprintf(dbgout, "attempting to open msg file %s %s\n", *message_files,
+                        current_mesg_file != NULL ? "success" : "failed");
             }
             message_files++;
         }
 
         if (current_mesg_file == NULL) {
-err:
+        err:
             current_mesg_file = NULL;
-            sprintf(buffer, "ERROR MESSAGE %d", msgid);        
+            sprintf(buffer, "ERROR MESSAGE %d", msgid);
             return;
         }
-        if (fgetc(current_mesg_file) != '@' || fscanf(current_mesg_file, "%d %d %d", &num_messages, &num_messages, &num_messages) != 3) {
+        if (fgetc(current_mesg_file) != '@' ||
+            fscanf(current_mesg_file, "%d %d %d", &num_messages, &num_messages, &num_messages) != 3) {
             goto err;
         }
-        
+
         short_offset = mem_alloc(error_handle, (unsigned int)(num_messages * 4), 4);
         long_offset = mem_alloc(error_handle, (unsigned int)(num_messages * 4), 4);
         ansi_offset = mem_alloc(error_handle, (unsigned int)(num_messages * 4), 4);
@@ -176,7 +179,8 @@ void lint_warning(ErrorStruct* arg0) {
     }
 
     get_error_message(message_text_buf, arg0->message & 0xFFFF, 0);
-    sprintf(error_buffer + strlen(error_buffer), message_text_buf, arg0->params[0], arg0->params[1], arg0->params[2], arg0->params[3]);
+    sprintf(error_buffer + strlen(error_buffer), message_text_buf, arg0->params[0], arg0->params[1], arg0->params[2],
+            arg0->params[3]);
     strcat(error_buffer, "\n");
     fprintf(D_1001BA78, "%s", error_buffer);
 }
@@ -184,7 +188,6 @@ void lint_warning(ErrorStruct* arg0) {
 static void print_error(ErrorStruct* arg0) {
     char* file;
     int line = 0;
-    
 
     if ((arg0->message >> 20) != 0 && error_already_reported[arg0->message & 0xFFFF]) {
         return;
@@ -229,7 +232,8 @@ static void print_error(ErrorStruct* arg0) {
         }
     }
     get_error_message(message_text_buf, arg0->message & 0xFFFF, 0);
-    sprintf(error_buffer + strlen(error_buffer), message_text_buf, arg0->params[0], arg0->params[1], arg0->params[2], arg0->params[3]);
+    sprintf(error_buffer + strlen(error_buffer), message_text_buf, arg0->params[0], arg0->params[1], arg0->params[2],
+            arg0->params[3]);
     if (IS_STRICT_ANSI) {
         get_error_message(message_text_buf, arg0->message & 0xFFFF, 2);
         if (strlen(message_text_buf) != 0) {
@@ -298,7 +302,7 @@ int error(int message, int level, int location, ...) {
             va_list args;
             va_start(args, location);
             for (i = 0; i < err_fmts[msgid].unk_00; i++) {
-                switch(fmts_arr[err_fmts[msgid].unk_02 + i].unk_04) {
+                switch (fmts_arr[err_fmts[msgid].unk_02 + i].unk_04) {
                     case 1:
                         sprintf(error_buffer, fmts_arr[err_fmts[msgid].unk_02 + i].unk_00, va_arg(args, int));
                         break;
@@ -309,7 +313,7 @@ int error(int message, int level, int location, ...) {
                         sprintf(error_buffer, fmts_arr[err_fmts[msgid].unk_02 + i].unk_00, va_arg(args, char*));
                         break;
                 }
-    
+
                 ers->params[i] = mem_alloc(error_handle, strlen(error_buffer) + 1, 1);
                 strcpy(ers->params[i], error_buffer);
             }
@@ -354,7 +358,7 @@ int error(int message, int level, int location, ...) {
         if (v1 != 0 && v1 < 8) {
             B_10022F38[v1 - 1]++;
         } else {
-            ((void)((!v1)||__assert("!i", "error.c", 471)));
+            ((void)((!v1) || __assert("!i", "error.c", 471)));
         }
     }
 

@@ -1,6 +1,7 @@
 #include "linklist.h"
 
-char* ident = "$Header: /hosts/bonnie/proj/irix6.4-ssg/isms/cmplrs/targucode/cfe/RCS/linklist.c,v 1.1 1992/07/29 18:45:02 wsj Exp $";
+char* ident = "$Header: /hosts/bonnie/proj/irix6.4-ssg/isms/cmplrs/targucode/cfe/RCS/linklist.c,v 1.1 1992/07/29 "
+              "18:45:02 wsj Exp $";
 
 LinkedList* link_start(MemCtx* mem, int size) {
     LinkedList* ll = mem_alloc(mem, sizeof(LinkedList), 4);
@@ -13,7 +14,7 @@ LinkedList* link_start(MemCtx* mem, int size) {
 void* get_link_elem(LinkedList* ll) {
     unsigned int i;
     void* retval = ll->free_list;
-    
+
     if (ll->free_list != NULL) {
         int* ptr = (int*)ll->free_list;
         // fill element with zeroes
@@ -22,7 +23,7 @@ void* get_link_elem(LinkedList* ll) {
             *ptr++ = NULL;
         }
     } else {
-        retval = mem_alloc(ll->mem, ll->elem_size, 8); 
+        retval = mem_alloc(ll->mem, ll->elem_size, 8);
     }
 
     return retval;
@@ -44,7 +45,7 @@ void* link_pop(LinkedList* ll) {
 void free_link_list(LinkedList* ll) {
     if (ll->free_list != NULL && ll->used_list != NULL) {
         LinkedListEntry* previous = ll->used_list;
-        LinkedListEntry* used_ptr = ll->used_list->next;        
+        LinkedListEntry* used_ptr = ll->used_list->next;
 
         while (used_ptr != NULL) {
             previous = used_ptr;

@@ -1,6 +1,7 @@
 #include "common.h"
 
-char* ident = "$Header: /hosts/bonnie/proj/irix6.4-ssg/isms/cmplrs/targucode/cfe/RCS/modes.c,v 1.1 1992/07/29 18:45:34 wsj Exp $";
+char* ident =
+    "$Header: /hosts/bonnie/proj/irix6.4-ssg/isms/cmplrs/targucode/cfe/RCS/modes.c,v 1.1 1992/07/29 18:45:34 wsj Exp $";
 
 void init_options(void) {
     options[OPTION_DOLLAR] = FALSE;

@@ -1,7 +1,8 @@
 #include "common.h"
 
 /* .data      */
-char* ident = "$Header: /hosts/bonnie/proj/irix6.4-ssg/isms/cmplrs/targucode/cfe/RCS/main.c,v 1.36 1995/12/13 22:32:10 zaineb Exp $";
+char* ident = "$Header: /hosts/bonnie/proj/irix6.4-ssg/isms/cmplrs/targucode/cfe/RCS/main.c,v 1.36 1995/12/13 22:32:10 "
+              "zaineb Exp $";
 static int unused = 0;
 char* outfile = "";
 
@@ -17,7 +18,7 @@ static int get_program_id(char* path);
 
 int main(int argc, char** argv) {
     char* error_file;
-    char* lang;    
+    char* lang;
     char* dir;
     int error_mode;
     char* dir_end;
@@ -83,7 +84,7 @@ int main(int argc, char** argv) {
 
     set_error_mode(error_mode);
 
-    switch(get_program_id(argv[0])) {
+    switch (get_program_id(argv[0])) {
         case 0:
             exit_code = 3;
             if (options[OPTION_LINT_FLAGS] & 1) {
@@ -108,7 +109,7 @@ int main(int argc, char** argv) {
             exit_code = lint(argc, argv);
             break;
         default:
-            ((void)((FALSE)||__assert("FALSE", "main.c", 0x9D)));
+            ((void)((FALSE) || __assert("FALSE", "main.c", 0x9D)));
             break;
     }
 
@@ -145,7 +146,7 @@ void fatal(void) {
 
 static void parse_woff(char* input, int* has_error, int* wrong_warn_number, int* invalid_input) {
     int i = 6;
-    int len = strlen(input);    
+    int len = strlen(input);
     int num1, num2;
 
     while (i < len) {
@@ -155,13 +156,13 @@ static void parse_woff(char* input, int* has_error, int* wrong_warn_number, int*
             while (isdigit(input[i])) {
                 i++;
             }
-            
+
             if (input[i] == '-' && isdigit(input[++i])) {
                 num2 = atoi(&input[i]);
             } else {
                 num2 = num1;
             }
-            
+
             while (num1 <= num2) {
                 if (!set_woff(num1)) {
                     *has_error = TRUE;
@@ -194,16 +195,16 @@ static void parse_cmdline(int argc, char** argv) {
     int invalid_woff = 0;
     int constModeChanged = 0;
     int sp78 = 0;
-    
+
     if (getenv("_XPG") != NULL) {
         xpg_flag = TRUE;
     } else {
         xpg_flag = FALSE;
     }
-    
+
     for (i = 1; i < argc; i++) {
         if (*argv[i] == '-') {
-            switch(argv[i][1]) {
+            switch (argv[i][1]) {
                 case 'M':
                     if (argv[i][2] == 'D') {
                         // skip next argument
@@ -217,7 +218,7 @@ static void parse_cmdline(int argc, char** argv) {
                     }
                     /* fallthrough */
                 case 'X':
-                    switch(argv[i][2]) {
+                    switch (argv[i][2]) {
                         case 'c':
                             if (strcmp(argv[i], "-Xcommon") == 0) {
                                 options[OPTION_XCOMMON] = TRUE;
@@ -277,9 +278,9 @@ static void parse_cmdline(int argc, char** argv) {
                                 int c;
                                 int s1;
                                 int size;
-                                
+
                                 while (c = *ptr) {
-                                    switch(*ptr) {
+                                    switch (*ptr) {
                                         case 'c':
                                             s1 = 1;
                                             break;
@@ -306,13 +307,13 @@ static void parse_cmdline(int argc, char** argv) {
                                             break;
                                         case 'D':
                                             s1 = 8;
-                                            break;                                        
+                                            break;
                                         default:
                                             fprintf(stderr, "-Xtypebind: unknown type %c\n", *ptr);
                                             s1 = 0;
                                             break;
                                     }
-                                    
+
                                     ptr++;
                                     size = atoi(ptr);
                                     if (size & 1) {
@@ -321,17 +322,14 @@ static void parse_cmdline(int argc, char** argv) {
                                     }
 
                                     bit_size[s1] = size;
-                                    while(isdigit(*ptr) || *ptr == ':') {
+                                    while (isdigit(*ptr) || *ptr == ':') {
                                         ptr++;
                                     }
                                 }
 
-                                if (bit_size[2] < bit_size[1] ||
-                                    bit_size[3] < bit_size[2] ||
-                                    bit_size[4] < bit_size[3] ||
-                                    bit_size[5] < bit_size[4] ||
-                                    bit_size[7] < bit_size[6] ||
-                                    bit_size[8] < bit_size[7]) {
+                                if (bit_size[2] < bit_size[1] || bit_size[3] < bit_size[2] ||
+                                    bit_size[4] < bit_size[3] || bit_size[5] < bit_size[4] ||
+                                    bit_size[7] < bit_size[6] || bit_size[8] < bit_size[7]) {
                                     fprintf(stderr, "-Xtypebind: specified sizes violate the language rules\n");
                                 }
                             }
@@ -348,7 +346,8 @@ static void parse_cmdline(int argc, char** argv) {
                                 options[OPTION_VOLATILE] = TRUE;
                                 error(0x4015F, 1, -1, "-volatile");
                                 break;
-                            } if (strcmp(argv[i], "-Xv") == 0) {
+                            }
+                            if (strcmp(argv[i], "-Xv") == 0) {
                                 options[OPTION_VERBOSITY] |= VERBOSE_FLAG_8;
                             }
                             break;
@@ -523,20 +522,18 @@ static void parse_cmdline(int argc, char** argv) {
         error(0x40135, 1, -1, "such as ", woff_warn_num, 500, 856);
     }
     if (options[OPTION_FULLWARN] && invalid_woff) {
-        error(0x40135, 1, -1, "numbers (ranges) should be seperated by commas only: e.g. -woff 505-550,", 607, 500, 856);
+        error(0x40135, 1, -1, "numbers (ranges) should be seperated by commas only: e.g. -woff 505-550,", 607, 500,
+              856);
     }
 }
 
-static char* default_path_dirs[] = {
-    "/usr/lib/",
-    "/lib/"
-};
+static char* default_path_dirs[] = { "/usr/lib/", "/lib/" };
 
 static char* get_directory(char* name) {
     char* path_ptr = getenv("PATH");
     int i;
     char buffer[100];
-    int fd;    
+    int fd;
     char* path;
 
     while (*path_ptr != 0) {

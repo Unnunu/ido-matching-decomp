@@ -24,7 +24,8 @@ struct WCharArray {
 };
 
 // .data
-char* ident = "$Header: /hosts/bonnie/proj/irix6.4-ssg/isms/cmplrs/targucode/cfe/RCS/screener.c,v 1.4 1993/01/21 15:14:40 hanny Exp $";
+char* ident = "$Header: /hosts/bonnie/proj/irix6.4-ssg/isms/cmplrs/targucode/cfe/RCS/screener.c,v 1.4 1993/01/21 "
+              "15:14:40 hanny Exp $";
 struct LegalTypeSpecifier legal_ts[] = {
     { TYPESPEC_CHAR, NULL },
     { TYPESPEC_INT, NULL },
@@ -75,7 +76,8 @@ void init_screener(void) {
     legal_ts[2].unk_04 = uint_type;
     legal_ts[3].unk_04 = short_type;
 
-    if (!options[OPTION_CPLUSPLUS] && !(options[OPTION_ANSI_MODE] & 1) && BASIC_TYPE(int_type).size == BASIC_TYPE(long_type).size) {
+    if (!options[OPTION_CPLUSPLUS] && !(options[OPTION_ANSI_MODE] & 1) &&
+        BASIC_TYPE(int_type).size == BASIC_TYPE(long_type).size) {
         legal_ts[15].unk_04 = int_type;
         legal_ts[4].unk_04 = int_type;
         legal_ts[23].unk_04 = int_type;
@@ -95,14 +97,15 @@ void init_screener(void) {
     legal_ts[10].unk_04 = uint_type;
     legal_ts[11].unk_04 = ushort_type;
 
-    if (!options[OPTION_CPLUSPLUS] && !(options[OPTION_ANSI_MODE] & 1) && BASIC_TYPE(uint_type).size == BASIC_TYPE(ulong_type).size) {
+    if (!options[OPTION_CPLUSPLUS] && !(options[OPTION_ANSI_MODE] & 1) &&
+        BASIC_TYPE(uint_type).size == BASIC_TYPE(ulong_type).size) {
         legal_ts[12].unk_04 = uint_type;
         legal_ts[25].unk_04 = uint_type;
     } else {
         legal_ts[12].unk_04 = ulong_type;
         legal_ts[25].unk_04 = ulong_type;
     }
-    
+
     legal_ts[13].unk_04 = NULL;
     legal_ts[14].unk_04 = short_type;
     legal_ts[16].unk_04 = char_type;
@@ -111,7 +114,7 @@ void init_screener(void) {
     legal_ts[19].unk_04 = short_type;
     legal_ts[20].unk_04 = ushort_type;
     legal_ts[21].unk_04 = int_type;
-    legal_ts[22].unk_04 = int_type;    
+    legal_ts[22].unk_04 = int_type;
 
     if (BASIC_TYPE(longdouble_type).size == BASIC_TYPE(double_type).size) {
         legal_ts[26].unk_04 = double_type;
@@ -148,10 +151,10 @@ int yylex(void) {
     int i;
     int len;
     unsigned int str_len;
-    char *str_ptr;
+    char* str_ptr;
     long* wstr_ptr;
     unsigned int wstr_len;
-    
+
     tokenId = GET_TOKEN();
     switch (tokenId) {
         case STRING:
@@ -187,7 +190,7 @@ int yylex(void) {
             for (i = 0, str_len = 0; i < (int)numStrings; i++) {
                 str = str_ptr = STRINGCONSTANT(B_1002F1B0.ptr[i].node).value;
                 len = ICONSTANT(ARRAY_TYPE(TREE_TYPE(B_1002F1B0.ptr[i].node)).index_type).value - 1;
-                
+
                 while (str_ptr < str + len) {
                     if (str_len >= B_1002F1A0.size) {
                         B_1002F1A0.size = str_len + 256;
@@ -210,7 +213,8 @@ int yylex(void) {
                 B_1002F1A0.ptr[str_len] = *str_ptr;
             }
 
-            yylval.node = make(Constant, TREE_LOCATION(B_1002F1B0.ptr[0].node), array_type, B_1002F1A0.ptr, str_len + 1);
+            yylval.node =
+                make(Constant, TREE_LOCATION(B_1002F1B0.ptr[0].node), array_type, B_1002F1A0.ptr, str_len + 1);
             return STRING;
         case WSTRING:
             // concatenate wide strings
@@ -267,7 +271,8 @@ int yylex(void) {
                 B_1002F1A8.ptr[wstr_len] = 0;
             }
 
-            yylval.node = make(Constant_special, TREE_LOCATION(B_1002F1B0.ptr[0].node), array_type, B_1002F1A8.ptr, wstr_len + 1);
+            yylval.node =
+                make(Constant_special, TREE_LOCATION(B_1002F1B0.ptr[0].node), array_type, B_1002F1A8.ptr, wstr_len + 1);
             return STRING;
         default:
             return tokenId;
