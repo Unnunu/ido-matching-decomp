@@ -1797,7 +1797,7 @@ TreeNode* make(int code, int location, ...) {
                     ARRAY_TYPE(type).align = bit_size[1];
                     t = mem_alloc(tree_handle, 0x18 + string_len * 1, 4); // sizeof(TreeNode_StringConstant) ?
                     TREE_CODE(type) = Array_type;
-                    TREE_TYPE(type) = options[6] ? char_type : uchar_type;
+                    TREE_TYPE(type) = options[OPTION_SIGNED] ? char_type : uchar_type;
                     type->id = ++last_node_id;
                     ARRAY_TYPE(type).index_type = make_iconstant(location, long_type, string_len);
                     memcpy(STRINGCONSTANT(t).value, str, string_len);
