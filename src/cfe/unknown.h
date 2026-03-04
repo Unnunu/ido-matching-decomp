@@ -133,5 +133,5 @@ void set_def_member_pack(int);
 void cpp_symentry_setMaxMacroRecursionDepth(int);
 void declarator(TreeNode* id, TreeNode* context, int sclass, int oclass, int attr, TreeNode* type);
 void enter_id(TreeNode* id);
-
+void* get_runtime_id(char*, TreeNode*, int);
 #endif
