@@ -123,7 +123,6 @@ Symbol* string_to_symbol(char*, size_t);
 unsigned int sizeof_type(int);
 char* get_type_name(int);
 int loc_to_cppline(int);
-void catchall(void);
 int lint(int argc, char** argv);
 int cfe(int argc, char** argv);
 int cpp(int argc, char** argv);
