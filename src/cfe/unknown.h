@@ -7,7 +7,6 @@
 #include "mem.h"
 #include "linklist.h"
 #include "tree.h"
-#include "tree.h"
 
 #define GET_SYM_CAT(x) (x != 0 ? (x == -1 ? "typedef" : "keyword") : "regular")
 
@@ -40,6 +39,16 @@ typedef struct FmtArr {
     char* unk_00;
     int unk_04;
 } FmtArr;
+
+typedef struct Scope {
+    TreeNode* unk_00;
+    int unk_04;
+    struct Scope* unk_08;
+    int unk_0C;
+    int unk_10;
+    int unk_14;
+    TreeNode* unk_18;
+} Scope;
 
 extern short act_to_imp[];
 extern short imp_to_act[];
@@ -90,7 +99,7 @@ extern TreeNode* longdouble_type;
 extern TreeNode* one_constant;
 extern TreeNode* zero_constant;
 extern TreeNode* ellipsis;
-extern int last_stdtree_id;
+extern unsigned int last_stdtree_id;
 extern unsigned short options[];
 extern unsigned long long __ULONGLONG_MAX;
 extern long long __LONGLONG_MAX;
@@ -113,9 +122,12 @@ extern MemCtx* tree_handle;
 extern MemCtx* temp_handle;
 extern Symbol* builtins[];
 extern Symbol* anonymous;
+extern Scope* function_scope;
+extern Scope* current_scope;
+extern Scope* file_scope;
 
 int real_file_line(int, char**, int*, int);
-int __assert(char*, char*, int);
+void __assert(char*, char*, int);
 void register_file(char*, int);
 float str_to_float(char* arg0, int arg1, int arg2);
 double str_to_double(char* arg0, int arg1, int arg2);
@@ -132,5 +144,5 @@ void set_def_member_pack(int);
 void cpp_symentry_setMaxMacroRecursionDepth(int);
 void* get_runtime_id(char*, TreeNode*, int);
 void declarator(TreeNode* id, TreeNode* context, int sclass, int oclass, int attr, TreeNode* type);
-void enter_id(TreeNode* id);
+void mips_st(TreeNode*);
 #endif

@@ -1,56 +1,57 @@
 #ifndef TREE_H
 #define TREE_H
 
-#define VOLATILE_ATTRIBUTE          0x80000000
-#define CONST_ATTRIBUTE             0x40000000
-#define PACKED_ATTRIBUTE            0x20000000
-#define TYPEDEF_ATTRIBUTE           0x10000000
-#define EXTERN_ATTRIBUTE            0x08000000
-#define STATIC_ATTRIBUTE            0x04000000
-#define AUTO_ATTRIBUTE              0x02000000
-#define REGISTER_ATTRIBUTE          0x01000000
-#define PROTECTED_ATTRIBUTE         0x00800000
-#define PUBLIC_ATTRIBUTE            0x00400000
-#define PRIVATE_ATTRIBUTE           0x00200000
-#define VIRTUAL_ATTRIBUTE           0x00100000
-#define FRIEND_ATTRIBUTE            0x00000800
-#define INLINE_ATTRIBUTE            0x00080000
-#define VAL_ATTRIBUTE               0x00040000
-#define REF_ATTRIBUTE               0x00020000
-#define VAR_ATTRIBUTE               0x00010000
-#define TRY_ATTRIBUTE               0x00008000
-#define INTR_ATTRIBUTE              0x00004000
-#define NO_SIDE_EFFECT_ATTRIBUTE    0x00000004
-#define TMP_REGS_INTACT_ATTRIBUTE   0x00000002
-#define WEAK_ATTRIBUTE              0x00002000
-#define INTU_ATTRIBUTE              0x00001000
-#define CONSTRUCTOR_ATTRIBUTE       0x00000800
-#define DESTRUCTOR_ATTRIBUTE        0x00000400
-#define OPERATOR_ATTRIBUTE          0x00000400
-#define PTR_TO_MEM_ATTRIBUTE        0x00000200
-#define ACCESS_ADJUST_ATTRIBUTE     0x00000100
-#define UNALIGNED_ATTRIBUTE         0x00000080
-#define CLINKAGE_ATTRIBUTE          0x00000040
-#define CPLUSLINKAGE_ATTRIBUTE      0x00000020
-#define FVAL_TRUEARRAY_ATTRIBUTE    0x00040000
-#define SWAP_ATTRIBUTE              0x04000000
-#define TMP_ATTRIBUTE               0x01000000
-#define BL_ATTRIBUTE                0x20000000
-#define BR_ATTRIBUTE                0x08000000
-#define LL_ATTRIBUTE                0x04000000
-#define LR_ATTRIBUTE                0x02000000
-#define UNSC_ATTRIBUTE              0x08000000
-#define PLAIN_ATTRIBUTE             0x00000010
+#define VOLATILE_ATTRIBUTE 0x80000000
+#define CONST_ATTRIBUTE 0x40000000
+#define PACKED_ATTRIBUTE 0x20000000
+#define TYPEDEF_ATTRIBUTE 0x10000000
+#define EXTERN_ATTRIBUTE 0x08000000
+#define STATIC_ATTRIBUTE 0x04000000
+#define AUTO_ATTRIBUTE 0x02000000
+#define REGISTER_ATTRIBUTE 0x01000000
+#define PROTECTED_ATTRIBUTE 0x00800000
+#define PUBLIC_ATTRIBUTE 0x00400000
+#define PRIVATE_ATTRIBUTE 0x00200000
+#define VIRTUAL_ATTRIBUTE 0x00100000
+#define FRIEND_ATTRIBUTE 0x00000800
+#define INLINE_ATTRIBUTE 0x00080000
+#define VAL_ATTRIBUTE 0x00040000
+#define REF_ATTRIBUTE 0x00020000
+#define VAR_ATTRIBUTE 0x00010000
+#define TRY_ATTRIBUTE 0x00008000
+#define INTR_ATTRIBUTE 0x00004000
+#define NO_SIDE_EFFECT_ATTRIBUTE 0x00000004
+#define TMP_REGS_INTACT_ATTRIBUTE 0x00000002
+#define WEAK_ATTRIBUTE 0x00002000
+#define INTU_ATTRIBUTE 0x00001000
+#define CONSTRUCTOR_ATTRIBUTE 0x00000800
+#define DESTRUCTOR_ATTRIBUTE 0x00000400
+#define OPERATOR_ATTRIBUTE 0x00000400
+#define PTR_TO_MEM_ATTRIBUTE 0x00000200
+#define ACCESS_ADJUST_ATTRIBUTE 0x00000100
+#define UNALIGNED_ATTRIBUTE 0x00000080
+#define CLINKAGE_ATTRIBUTE 0x00000040
+#define CPLUSLINKAGE_ATTRIBUTE 0x00000020
+#define FVAL_TRUEARRAY_ATTRIBUTE 0x00040000
+#define SWAP_ATTRIBUTE 0x04000000
+#define TMP_ATTRIBUTE 0x01000000
+#define BL_ATTRIBUTE 0x20000000
+#define BR_ATTRIBUTE 0x08000000
+#define LL_ATTRIBUTE 0x04000000
+#define LR_ATTRIBUTE 0x02000000
+#define UNSC_ATTRIBUTE 0x08000000
+#define PLAIN_ATTRIBUTE 0x00000010
 
-#define STORAGE_CLASS_ATTRIBUTE (TYPEDEF_ATTRIBUTE|EXTERN_ATTRIBUTE|STATIC_ATTRIBUTE|AUTO_ATTRIBUTE|REGISTER_ATTRIBUTE)
+#define STORAGE_CLASS_ATTRIBUTE \
+    (TYPEDEF_ATTRIBUTE | EXTERN_ATTRIBUTE | STATIC_ATTRIBUTE | AUTO_ATTRIBUTE | REGISTER_ATTRIBUTE)
 
-#define STRUCT_INFO_STRUCT              0x80000000
-#define STRUCT_INFO_UNION               0x40000000
-#define STRUCT_INFO_CLASS               0x20000000
-#define STRUCT_INFO_CONST_MEMBERS       0x10000000
-#define STRUCT_INFO_VOLATILE_MEMBERS    0x08000000
-#define STRUCT_INFO_PACKED              0x04000000
-#define STRUCT_INFO_COMPLETE            0x02000000
+#define STRUCT_INFO_STRUCT 0x80000000
+#define STRUCT_INFO_UNION 0x40000000
+#define STRUCT_INFO_CLASS 0x20000000
+#define STRUCT_INFO_CONST_MEMBERS 0x10000000
+#define STRUCT_INFO_VOLATILE_MEMBERS 0x08000000
+#define STRUCT_INFO_PACKED 0x04000000
+#define STRUCT_INFO_COMPLETE 0x02000000
 
 #define TREE_ID(t) (t == NULL ? 0 : ((TreeNode*)t)->id)
 #define TREE_CODE(t) (((TreeNode*)t)->code)
@@ -95,13 +96,12 @@
 #define GET_PRAGMA(t) (*((TreeNode_Pragma*)t))
 #define ACCESS_SPEC(t) (*((TreeNode_Access_spec*)t))
 
-#define IS_STD_TREE(t) (t == char_type || t == double_type || t == int_type || \
-        t == int_type || t == float_type || t == long_type || t == longlong_type || \
-        t == longdouble_type || t == short_type || t == signed_type || \
-        t == unsigned_type || t == uchar_type || t == uint_type || \
-        t == ulong_type || t == ulonglong_type || t == ushort_type || \
-        t == label_type || t == void_type || t == any_type || \
-        t == int32_type || t == uint32_type || t == int64_type || t == uint64_type)
+#define IS_STD_TREE(t)                                                                                               \
+    (t == char_type || t == double_type || t == int_type || t == int_type || t == float_type || t == long_type ||    \
+     t == longlong_type || t == longdouble_type || t == short_type || t == signed_type || t == unsigned_type ||      \
+     t == uchar_type || t == uint_type || t == ulong_type || t == ulonglong_type || t == ushort_type ||              \
+     t == label_type || t == void_type || t == any_type || t == int32_type || t == uint32_type || t == int64_type || \
+     t == uint64_type)
 
 enum TreeCodes {
     Identifier,
@@ -340,7 +340,7 @@ typedef struct TreeNode_Field_decl {
 
 typedef struct TreeNode_Id_decl {
     TreeNode t;
-    Symbol* id;
+    struct Symbol* id;
     TreeNode* init_value;
     TreeNode* qualifiers;
     int offset;
@@ -615,7 +615,7 @@ typedef struct TreeNode_DblConstant {
 
 typedef struct TreeNode_RealConstant {
     TreeNode t;
-    Symbol* value; // not sure
+    struct Symbol* value; // not sure
     int unk_1C;
 } TreeNode_RealConstant;
 
@@ -631,7 +631,7 @@ typedef struct TreeNode_WStringConstant {
 
 typedef struct TreeNode_Identifier {
     TreeNode t;
-    Symbol* id;
+    struct Symbol* id;
 } TreeNode_Identifier;
 
 typedef struct TreeNode_Pragma {
@@ -649,6 +649,7 @@ TreeNode* make(int code, int location, ...);
 TreeNode* make_uiconstant(int, TreeNode*, unsigned long long);
 TreeNode* make_iconstant(int, TreeNode*, long long);
 TreeNode* make_pointer(TreeNode* arg0);
+TreeNode* duplicate_node(TreeNode* t);
 float str_to_float(char* arg0, int arg1, int arg2);
 double str_to_double(char* arg0, int arg1, int arg2);
 

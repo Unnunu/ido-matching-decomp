@@ -10,7 +10,7 @@ typedef struct UnkCodegen_Struct_s {
 struct Uw_if {     /* output format for each type	*/
     int If_nbytes; /*  # of bytes to read (doesn't include opcode or val)*/
     int If_hasval; /*  if it has a value		*/
-}; 
+};
 
 /* U-code output formats	*/
 enum /*				*/
@@ -30,7 +30,7 @@ struct Uw_of {             /* output format for each type	*/
     /*		choose		*/
     int Of_nbytes;   /* number of bytes		*/
     int Of_hasval;   /* set if it has a constant	*/
-    char *Of_format; /*    a "printf" style output	*/
+    char* Of_format; /*    a "printf" style output	*/
     /*		format string	*/
 }; /*				*/
 
@@ -40,23 +40,23 @@ typedef struct UnkStruct_RuntimeId_s {
 } UnkStruct_RuntimeId;
 
 extern int Label_sufix;
-extern struct Bcrec *Ucp;
+extern struct Bcrec* Ucp;
 extern char Uout_buff[];
 extern struct Uw_of Uw_of[];
 extern int addr_dtype;
-extern FILE *Ucw_binout;
+extern FILE* Ucw_binout;
 
-void UWRITE(void *ucode, int size) {
+void UWRITE(void* ucode, int size) {
     if (debug_arr['U'] >= 3) {
         fprintf(dbgout, "writing ucode size=%d\n", size);
     }
-    if (fwrite(ucode, 1, size, Ucw_binout) != (unsigned int) size) {
+    if (fwrite(ucode, 1, size, Ucw_binout) != (unsigned int)size) {
         error(0x50087, LEVEL_FATAL, -1, infile ? infile : "");
     }
 }
 
 // This match is just *wrong*
-void UW_CONST_str(char *str) {
+void UW_CONST_str(char* str) {
     size_t len; /* compiler-managed */
 
     if (strlen(str) >= Filenamelen + 1) {
@@ -65,7 +65,7 @@ void UW_CONST_str(char *str) {
         len = strlen(str);
     }
     UWRITE(&len, sizeof(len));
-    len = (int) (len + 3) / 4;
+    len = (int)(len + 3) / 4;
     UWRITE(&len, sizeof(len));
     if ((len & 1) == 1) {
         len++;
@@ -73,11 +73,11 @@ void UW_CONST_str(char *str) {
     UWRITE(str, len * 4);
 }
 
-void UW_CONST_m(int arg0, void *arg1) {
+void UW_CONST_m(int arg0, void* arg1) {
     int sp24; /* compiler-managed */
 
     UWRITE(&arg0, 4U);
-    sp24 = (int) (arg0 + 3) / 4;
+    sp24 = (int)(arg0 + 3) / 4;
     UWRITE(&sp24, 4U);
     if ((sp24 & 1) == 1) {
         sp24 += 1;
@@ -93,7 +93,7 @@ void UW_CONST_s(int arg0, int arg1) {
     sprintf(filename, "%d", arg1);
     sp24 = strlen(filename);
     UWRITE(&sp24, 4U);
-    sp24 = (int) (sp24 + 3) / 4;
+    sp24 = (int)(sp24 + 3) / 4;
     UWRITE(&sp24, 4U);
     if ((sp24 & 1) == 1) {
         sp24 += 1;
@@ -101,9 +101,9 @@ void UW_CONST_s(int arg0, int arg1) {
     UWRITE(filename, sp24 * 4);
 }
 
-void UW_CONST_f(char *arg0, double arg2, int arg4) {
+void UW_CONST_f(char* arg0, double arg2, int arg4) {
     char buf[1024];
-    char *ptr;
+    char* ptr;
 
     if (arg0 == NULL) {
         sprintf(buf, "%.16e", arg2);
@@ -120,8 +120,7 @@ void UW_CONST_f(char *arg0, double arg2, int arg4) {
         ptr++;
     }
 
-    if ((arg0 < ptr)
-        && (((ptr[-1] == 'F')) || (ptr[-1] == 'f') || (ptr[-1] == 'L') || (ptr[-1] == 'l'))) {
+    if ((arg0 < ptr) && (((ptr[-1] == 'F')) || (ptr[-1] == 'f') || (ptr[-1] == 'L') || (ptr[-1] == 'l'))) {
         ptr[-1] = '\0';
     }
     UW_CONST_str(arg0);
@@ -148,60 +147,60 @@ void UW_CONST_lli(long long arg0) {
     UWRITE(&arg0, sizeof(arg0));
 }
 
-enum Datatype U_DT(UnkCodegen_Struct *arg0) {
+enum Datatype U_DT(UnkCodegen_Struct* arg0) {
     switch (arg0->node.code) {
-    case Array_type:
-    case Struct_type:
-        return Mdt;
-    case Pointer_type:
-        return addr_dtype;
-    case Func_type:
-        return Fdt;
-    case Void_type:
-    case Any_type:
-        return Pdt;
-    case Label_type:
-        return Ndt;
-    case Signed_type:
-        __assert("FALSE", "codegen.c", 192);
-        /* fallthrough */
-    case Char_type:
-    case Int_type:
-    case Long_type:
-    case Longlong_type:
-    case Short_type:
-    case Enum_type:
-        if (arg0->unk18 >= 0x21) {
-            return Idt;
-        }
-        return Jdt;
-    case Unsigned_type:
-        __assert("FALSE", "codegen.c", 210);
-        /* fallthrough */
-    case Uchar_type:
-    case Uint_type:
-    case Ulong_type:
-    case Ulonglong_type:
-    case Ushort_type:
-        if (arg0->unk18 >= 0x21) {
-            return Kdt;
-        }
-        return Ldt;
-    case Double_type:
-    case Longdouble_type:
-    case Float_type:
-        if (arg0->unk18 == 0x20) {
-            return Rdt;
-        }
-        return Qdt;
-    default:
-        return __assert("FALSE", "codegen.c", 233);
+        case Array_type:
+        case Struct_type:
+            return Mdt;
+        case Pointer_type:
+            return addr_dtype;
+        case Func_type:
+            return Fdt;
+        case Void_type:
+        case Any_type:
+            return Pdt;
+        case Label_type:
+            return Ndt;
+        case Signed_type:
+            __assert("FALSE", "codegen.c", 192);
+            /* fallthrough */
+        case Char_type:
+        case Int_type:
+        case Long_type:
+        case Longlong_type:
+        case Short_type:
+        case Enum_type:
+            if (arg0->unk18 >= 0x21) {
+                return Idt;
+            }
+            return Jdt;
+        case Unsigned_type:
+            __assert("FALSE", "codegen.c", 210);
+            /* fallthrough */
+        case Uchar_type:
+        case Uint_type:
+        case Ulong_type:
+        case Ulonglong_type:
+        case Ushort_type:
+            if (arg0->unk18 >= 0x21) {
+                return Kdt;
+            }
+            return Ldt;
+        case Double_type:
+        case Longdouble_type:
+        case Float_type:
+            if (arg0->unk18 == 0x20) {
+                return Rdt;
+            }
+            return Qdt;
+        default:
+            __assert("FALSE", "codegen.c", 233);
+            /* no return */
     }
 }
 
-
-int init_codegen(char *arg0, FILE *arg1, int arg2) {
-    UnkStruct_RuntimeId *temp_v0;
+int init_codegen(char* arg0, FILE* arg1, int arg2) {
+    UnkStruct_RuntimeId* temp_v0;
 
     Label_sufix = 0xA;
     if (arg1 != 0) {
@@ -229,7 +228,7 @@ int init_codegen(char *arg0, FILE *arg1, int arg2) {
         UWRITE(Uout_buff, (char*)Ucp - (char*)Uout_buff);
         Ucp = (struct Bcrec*)Uout_buff;
     }
-    
+
     Ucp->Opc = Uoptn;
     Ucp->I1 = 0;
     Ucp->Uopcde.uiequ1.Length = arg2;
@@ -239,7 +238,7 @@ int init_codegen(char *arg0, FILE *arg1, int arg2) {
         UWRITE(Uout_buff, (char*)Ucp - (char*)Uout_buff);
         Ucp = (struct Bcrec*)Uout_buff;
     }
-    
+
     Ucp->Opc = Ucomm;
     Ucp->Dtype = Mdt;
 
@@ -248,11 +247,11 @@ int init_codegen(char *arg0, FILE *arg1, int arg2) {
         UWRITE(Uout_buff, (char*)Ucp - (char*)Uout_buff);
         Ucp = (struct Bcrec*)Uout_buff;
     }
-    
+
     UWRITE(Uout_buff, (char*)Ucp - (char*)Uout_buff);
     Ucp = (struct Bcrec*)Uout_buff;
 
-    UW_CONST_m((size_t) strlen(arg0) >= 1024 + 1 ? 1024 : strlen(arg0), arg0);
+    UW_CONST_m((size_t)strlen(arg0) >= 1024 + 1 ? 1024 : strlen(arg0), arg0);
     if (options[OPTION_VERBOSITY] & VERBOSE_FLAG_8) {
         fprintf(stderr, "%s: ", myname);
         fflush(stderr);
@@ -262,7 +261,7 @@ int init_codegen(char *arg0, FILE *arg1, int arg2) {
         if (temp_v0 != 0) {
             Ucp->Opc = 0x63;
             Ucp->I1 = 2;
-            Ucp->Uopcde.uiequ1.Length = (int) temp_v0->unk3C;
+            Ucp->Uopcde.uiequ1.Length = (int)temp_v0->unk3C;
 
             Ucp = (struct Bcrec*)((char*)Ucp + Uw_of[Ucp->Opc].Of_nbytes);
             if ((char*)Ucp - (char*)Uout_buff > 0x800) {
@@ -280,12 +279,11 @@ static void func_004628B0(void) {
     Ucp = (struct Bcrec*)((char*)Ucp + Uw_of[Ucp->Opc].Of_nbytes);
     if ((char*)Ucp - (char*)Uout_buff >= 0x801) {
         UWRITE(Uout_buff, (char*)Ucp - (char*)Uout_buff);
-        Ucp = (struct Bcrec *) Uout_buff;
+        Ucp = (struct Bcrec*)Uout_buff;
     }
     UWRITE(Uout_buff, (char*)Ucp - (char*)Uout_buff);
-    Ucp = (struct Bcrec *) Uout_buff;
+    Ucp = (struct Bcrec*)Uout_buff;
 }
-
 
 #pragma GLOBAL_ASM("asm/7.1/functions/cfe/codegen/uw_init.s")
 

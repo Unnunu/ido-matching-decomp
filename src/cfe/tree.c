@@ -13,186 +13,166 @@ static int last_node_id = 0;
 static int is_making_constant = FALSE;
 
 char* type_name[] = {
-    "ident",
-    "double",
-    "long double",
-    "float",
-    "label",
-    "char",
-    "int",
-    "long",
-    "long long",
-    "short",
-    "signed",
-    "unsigned",
-    "unsigned char",
-    "unsigned int",
-    "unsigned long",
-    "unsigned long long",
-    "unsigned short",
-    "void",
-    "any type",
-    "array",
-    "enum",
-    "function",
-    "pointer",
-    "reference",
+    "ident",          "double",       "long double",   "float",
+    "label",          "char",         "int",           "long",
+    "long long",      "short",        "signed",        "unsigned",
+    "unsigned char",  "unsigned int", "unsigned long", "unsigned long long",
+    "unsigned short", "void",         "any type",      "array",
+    "enum",           "function",     "pointer",       "reference",
     "struct",
 };
 
-static char* code_name[] = {
-    "Identifier",
-    "Double_type",
-    "Longdouble_type",
-    "Float_type",
-    "Label_type",
-    "Char_type",
-    "Int_type",
-    "Long_type",
-    "Longlong_type",
-    "Short_type",
-    "Signed_type",
-    "Unsigned_type",
-    "Uchar_type",
-    "Uint_type",
-    "Ulong_type",
-    "Ulonglong_type",
-    "Ushort_type",
-    "Void_type",
-    "Any_type",
-    "Array_type",
-    "Enum_type",
-    "Func_type",
-    "Pointer_type",
-    "Reference_type",
-    "Struct_type",
-    "Break_stmt",
-    "Caselabeled_stmt",
-    "Compound_stmt",
-    "Continue_stmt",
-    "Defaultlabeled_stmt",
-    "Dowhile_stmt",
-    "Expr_stmt",
-    "For_stmt",
-    "Goto_stmt",
-    "Idlabeled_stmt",
-    "If_stmt",
-    "Init",
-    "Return_stmt",
-    "Switch_stmt",
-    "While_stmt",
-    "Try_stmt",
-    "Leave_stmt",
-    "Addr_expr",
-    "Alignof_expr",
-    "Bitcomplement_expr",
-    "Classof_expr",
-    "Indirect_expr",
-    "Not_expr",
-    "Postdecrement_expr",
-    "Postincrement_expr",
-    "Predecrement_expr",
-    "Preincrement_expr",
-    "Sizeof_expr",
-    "Uminus_expr",
-    "Uplus_expr",
-    "Delete_expr",
-    "Addrrel_expr",
-    "And_expr",
-    "Assign_expr",
-    "Bitand_expr",
-    "Bitor_expr",
-    "Bitxor_expr",
-    "Bitand_assign_expr",
-    "Bitor_assign_expr",
-    "Bitxor_assign_expr",
-    "Call_expr",
-    "Cast_expr",
-    "Comma_expr",
-    "Div_expr",
-    "Div_assign_expr",
-    "Eq_expr",
-    "Gt_expr",
-    "Geq_expr",
-    "Index_expr",
-    "Leq_expr",
-    "Lshift_expr",
-    "Lshift_assign_expr",
-    "Lt_expr",
-    "Minus_expr",
-    "Minus_assign_expr",
-    "Rem_expr",
-    "Rem_assign_expr",
-    "Mult_expr",
-    "Mult_assign_expr",
-    "Neq_expr",
-    "Or_expr",
-    "Plus_expr",
-    "Plus_assign_expr",
-    "Rshift_expr",
-    "Rshift_assign_expr",
-    "New_expr",
-    "Member_init_expr",
-    "Conditional_expr",
-    "Aggregate_expr",
-    "Array_ref",
-    "Component_ref",
-    "Indirect_component_ref",
-    "Qualified_ref",
-    "Declare_decl",
-    "Id_decl",
-    "Field_decl",
-    "Constant",
-    "End_of_file",
-    "Nop",
-    "Constant_special",
-    "Error_mark",
-    "Pragma",
-    "Access_spec",
-    "Reserved"
-};
+static char* code_name[] = { "Identifier",
+                             "Double_type",
+                             "Longdouble_type",
+                             "Float_type",
+                             "Label_type",
+                             "Char_type",
+                             "Int_type",
+                             "Long_type",
+                             "Longlong_type",
+                             "Short_type",
+                             "Signed_type",
+                             "Unsigned_type",
+                             "Uchar_type",
+                             "Uint_type",
+                             "Ulong_type",
+                             "Ulonglong_type",
+                             "Ushort_type",
+                             "Void_type",
+                             "Any_type",
+                             "Array_type",
+                             "Enum_type",
+                             "Func_type",
+                             "Pointer_type",
+                             "Reference_type",
+                             "Struct_type",
+                             "Break_stmt",
+                             "Caselabeled_stmt",
+                             "Compound_stmt",
+                             "Continue_stmt",
+                             "Defaultlabeled_stmt",
+                             "Dowhile_stmt",
+                             "Expr_stmt",
+                             "For_stmt",
+                             "Goto_stmt",
+                             "Idlabeled_stmt",
+                             "If_stmt",
+                             "Init",
+                             "Return_stmt",
+                             "Switch_stmt",
+                             "While_stmt",
+                             "Try_stmt",
+                             "Leave_stmt",
+                             "Addr_expr",
+                             "Alignof_expr",
+                             "Bitcomplement_expr",
+                             "Classof_expr",
+                             "Indirect_expr",
+                             "Not_expr",
+                             "Postdecrement_expr",
+                             "Postincrement_expr",
+                             "Predecrement_expr",
+                             "Preincrement_expr",
+                             "Sizeof_expr",
+                             "Uminus_expr",
+                             "Uplus_expr",
+                             "Delete_expr",
+                             "Addrrel_expr",
+                             "And_expr",
+                             "Assign_expr",
+                             "Bitand_expr",
+                             "Bitor_expr",
+                             "Bitxor_expr",
+                             "Bitand_assign_expr",
+                             "Bitor_assign_expr",
+                             "Bitxor_assign_expr",
+                             "Call_expr",
+                             "Cast_expr",
+                             "Comma_expr",
+                             "Div_expr",
+                             "Div_assign_expr",
+                             "Eq_expr",
+                             "Gt_expr",
+                             "Geq_expr",
+                             "Index_expr",
+                             "Leq_expr",
+                             "Lshift_expr",
+                             "Lshift_assign_expr",
+                             "Lt_expr",
+                             "Minus_expr",
+                             "Minus_assign_expr",
+                             "Rem_expr",
+                             "Rem_assign_expr",
+                             "Mult_expr",
+                             "Mult_assign_expr",
+                             "Neq_expr",
+                             "Or_expr",
+                             "Plus_expr",
+                             "Plus_assign_expr",
+                             "Rshift_expr",
+                             "Rshift_assign_expr",
+                             "New_expr",
+                             "Member_init_expr",
+                             "Conditional_expr",
+                             "Aggregate_expr",
+                             "Array_ref",
+                             "Component_ref",
+                             "Indirect_component_ref",
+                             "Qualified_ref",
+                             "Declare_decl",
+                             "Id_decl",
+                             "Field_decl",
+                             "Constant",
+                             "End_of_file",
+                             "Nop",
+                             "Constant_special",
+                             "Error_mark",
+                             "Pragma",
+                             "Access_spec",
+                             "Reserved" };
 
 struct AttrDesc attr_list[] = {
-    { VOLATILE_ATTRIBUTE,           "VOL" },
-    { CONST_ATTRIBUTE,              "CONST" },
-    { PACKED_ATTRIBUTE,             "PACK" },
-    { TYPEDEF_ATTRIBUTE,               "TYPE" },
-    { EXTERN_ATTRIBUTE,             "EXT" },
-    { STATIC_ATTRIBUTE,             "STAT" },
-    { AUTO_ATTRIBUTE,               "AUTO" },
-    { REGISTER_ATTRIBUTE,           "REG" },
-    { PROTECTED_ATTRIBUTE,          "PROT" },
-    { PUBLIC_ATTRIBUTE,             "PUB" },
-    { PRIVATE_ATTRIBUTE,            "PRIV" },
-    { VIRTUAL_ATTRIBUTE,            "VIRT" },
-    { FRIEND_ATTRIBUTE,             "FRIE" },
-    { INLINE_ATTRIBUTE,             "INL" },
-    { VAL_ATTRIBUTE,                "VAL" },
-    { REF_ATTRIBUTE,                "REF" },
-    { VAR_ATTRIBUTE,                "VAR" },
-    { TRY_ATTRIBUTE,                "TRY" },
-    { INTR_ATTRIBUTE,               "INTR" },
-    { NO_SIDE_EFFECT_ATTRIBUTE,     "NO_SIDE_EFFECT" },
-    { TMP_REGS_INTACT_ATTRIBUTE,    "TMP_REGS_INTACT" },
-    { WEAK_ATTRIBUTE,               "WEAK" },
-    { INTU_ATTRIBUTE,               "INTU" },
-    { CONSTRUCTOR_ATTRIBUTE,        "CONSTUCTOR" }, // typo
-    { DESTRUCTOR_ATTRIBUTE,         "DESTRUCTOR" },
-    { OPERATOR_ATTRIBUTE,           "OPER" },
-    { PTR_TO_MEM_ATTRIBUTE,         "PTR_TO_MEM" },
-    { ACCESS_ADJUST_ATTRIBUTE,      "ACCESS_ADJUST" },
-    { UNALIGNED_ATTRIBUTE,          "UNALIGNED" },
-    { CLINKAGE_ATTRIBUTE,           "CLINKAGE" },
-    { CPLUSLINKAGE_ATTRIBUTE,       "CPLUSLINKAGE" },
-    { FVAL_TRUEARRAY_ATTRIBUTE,     "FVAL(TRUEARRAY)" },
-    { SWAP_ATTRIBUTE,               "SWAP" },
-    { TMP_ATTRIBUTE,                "TMP" },
-    { BL_ATTRIBUTE,                 "BL" },
-    { BR_ATTRIBUTE,                 "BR" },
-    { LL_ATTRIBUTE,                 "LL" },
-    { LR_ATTRIBUTE,                 "LR" },
-    { UNSC_ATTRIBUTE,               "UNSC" },
-    { PLAIN_ATTRIBUTE,              "PLAIN" },
+    { VOLATILE_ATTRIBUTE, "VOL" },
+    { CONST_ATTRIBUTE, "CONST" },
+    { PACKED_ATTRIBUTE, "PACK" },
+    { TYPEDEF_ATTRIBUTE, "TYPE" },
+    { EXTERN_ATTRIBUTE, "EXT" },
+    { STATIC_ATTRIBUTE, "STAT" },
+    { AUTO_ATTRIBUTE, "AUTO" },
+    { REGISTER_ATTRIBUTE, "REG" },
+    { PROTECTED_ATTRIBUTE, "PROT" },
+    { PUBLIC_ATTRIBUTE, "PUB" },
+    { PRIVATE_ATTRIBUTE, "PRIV" },
+    { VIRTUAL_ATTRIBUTE, "VIRT" },
+    { FRIEND_ATTRIBUTE, "FRIE" },
+    { INLINE_ATTRIBUTE, "INL" },
+    { VAL_ATTRIBUTE, "VAL" },
+    { REF_ATTRIBUTE, "REF" },
+    { VAR_ATTRIBUTE, "VAR" },
+    { TRY_ATTRIBUTE, "TRY" },
+    { INTR_ATTRIBUTE, "INTR" },
+    { NO_SIDE_EFFECT_ATTRIBUTE, "NO_SIDE_EFFECT" },
+    { TMP_REGS_INTACT_ATTRIBUTE, "TMP_REGS_INTACT" },
+    { WEAK_ATTRIBUTE, "WEAK" },
+    { INTU_ATTRIBUTE, "INTU" },
+    { CONSTRUCTOR_ATTRIBUTE, "CONSTUCTOR" }, // typo
+    { DESTRUCTOR_ATTRIBUTE, "DESTRUCTOR" },
+    { OPERATOR_ATTRIBUTE, "OPER" },
+    { PTR_TO_MEM_ATTRIBUTE, "PTR_TO_MEM" },
+    { ACCESS_ADJUST_ATTRIBUTE, "ACCESS_ADJUST" },
+    { UNALIGNED_ATTRIBUTE, "UNALIGNED" },
+    { CLINKAGE_ATTRIBUTE, "CLINKAGE" },
+    { CPLUSLINKAGE_ATTRIBUTE, "CPLUSLINKAGE" },
+    { FVAL_TRUEARRAY_ATTRIBUTE, "FVAL(TRUEARRAY)" },
+    { SWAP_ATTRIBUTE, "SWAP" },
+    { TMP_ATTRIBUTE, "TMP" },
+    { BL_ATTRIBUTE, "BL" },
+    { BR_ATTRIBUTE, "BR" },
+    { LL_ATTRIBUTE, "LL" },
+    { LR_ATTRIBUTE, "LR" },
+    { UNSC_ATTRIBUTE, "UNSC" },
+    { PLAIN_ATTRIBUTE, "PLAIN" },
 };
 
 // .bss
@@ -222,7 +202,7 @@ void display_attr(int attr) {
     int i;
     int foundAttrs = 0;
     int found = FALSE;
-    
+
     if (attr == 0) {
         fprintf(stderr, "0 ");
         return;
@@ -249,7 +229,7 @@ void display_node(TreeNode* t) {
     int j;
     int k;
     int l;
-    
+
     if (t == NULL) {
         return;
     }
@@ -425,10 +405,8 @@ void display_node(TreeNode* t) {
             fprintf(stderr, "expr=%u ", TREE_ID(TRY_STMT(t).expr));
             fprintf(stderr, "guard=%u ", TREE_ID(TRY_STMT(t).guard));
             fprintf(stderr, "handler=%u ", TREE_ID(TRY_STMT(t).handler));
-            fprintf(stderr, "begin_addr=%u end_addr=%u label=%d jmp_target=%d\n",
-                TREE_ID(TRY_STMT(t).begin_addr),
-                TREE_ID(TRY_STMT(t).end_addr),
-                TRY_STMT(t).label, TRY_STMT(t).jmp_target);
+            fprintf(stderr, "begin_addr=%u end_addr=%u label=%d jmp_target=%d\n", TREE_ID(TRY_STMT(t).begin_addr),
+                    TREE_ID(TRY_STMT(t).end_addr), TRY_STMT(t).label, TRY_STMT(t).jmp_target);
             break;
         case Dowhile_stmt:
             fprintf(stderr, "stmt=%u ", TREE_ID(DOWHILE_STMT(t).stmt));
@@ -525,7 +503,7 @@ void display_node(TreeNode* t) {
             break;
         case Constant:
             switch (TREE_CODE(TREE_TYPE(t))) {
-                
+
                 case Char_type:
                 case Int_type:
                 case Long_type:
@@ -541,7 +519,8 @@ void display_node(TreeNode* t) {
                 case Ulonglong_type:
                 case Ushort_type:
                 case Pointer_type:
-                    fprintf(stderr, "ui64=(%u,%u)\n", *(unsigned long*)&UICONSTANT(t).value, (unsigned long)UICONSTANT(t).value);
+                    fprintf(stderr, "ui64=(%u,%u)\n", *(unsigned long*)&UICONSTANT(t).value,
+                            (unsigned long)UICONSTANT(t).value);
                     break;
                 case Double_type:
                 case Longdouble_type:
@@ -558,17 +537,19 @@ void display_node(TreeNode* t) {
                     }
                     break;
                 case Array_type:
-                    if (TREE_CODE(t) == Constant &&
-                        TREE_CODE(TREE_TYPE(t)) == Array_type &&
-                        (TREE_CODE(TREE_TYPE(TREE_TYPE(t))) == Uchar_type || TREE_CODE(TREE_TYPE(TREE_TYPE(t))) == Char_type)) {
+                    if (TREE_CODE(t) == Constant && TREE_CODE(TREE_TYPE(t)) == Array_type &&
+                        (TREE_CODE(TREE_TYPE(TREE_TYPE(t))) == Uchar_type ||
+                         TREE_CODE(TREE_TYPE(TREE_TYPE(t))) == Char_type)) {
                         fprintf(stderr, "s=%s\n", STRINGCONSTANT(t).value);
                     } else {
-                        for (k = 0, l = 3; k < ICONSTANT(ARRAY_TYPE(TREE_TYPE(t)).index_type).value && k != 80; k++, l++) {
+                        for (k = 0, l = 3; k < ICONSTANT(ARRAY_TYPE(TREE_TYPE(t)).index_type).value && k != 80;
+                             k++, l++) {
                             if (l == 7) {
                                 fprintf(stderr, "\n");
                                 l = 0;
                             }
-                            fprintf(stderr, "w[%d]=%ld (%c) ", k, WSTRINGCONSTANT(t).value[k], WSTRINGCONSTANT(t).value[k]);
+                            fprintf(stderr, "w[%d]=%ld (%c) ", k, WSTRINGCONSTANT(t).value[k],
+                                    WSTRINGCONSTANT(t).value[k]);
                         }
                         fprintf(stderr, "\n");
                     }
@@ -587,7 +568,8 @@ void display_node(TreeNode* t) {
             fprintf(stderr, "\n");
             break;
         case Pragma:
-            fprintf(stderr, "pragma_type = %d, argument=%u\n", GET_PRAGMA(t).pragma_type, TREE_ID(GET_PRAGMA(t).argument));
+            fprintf(stderr, "pragma_type = %d, argument=%u\n", GET_PRAGMA(t).pragma_type,
+                    TREE_ID(GET_PRAGMA(t).argument));
             break;
         case Access_spec:
             fprintf(stderr, "access=%u\n", TREE_ID(ACCESS_SPEC(t).access));
@@ -597,7 +579,6 @@ void display_node(TreeNode* t) {
             break;
     }
 }
-
 
 void preorder_walk(TreeNode* t, void (*disp)(TreeNode*)) {
     TreeNode* child;
@@ -964,7 +945,7 @@ static TreeNode* debug_child(TreeNode* t, char* c) {
                 case 'l':
                     return ENUM_TYPE(t).literals;
                 case 'e':
-                    return ENUM_TYPE(t).ename;                
+                    return ENUM_TYPE(t).ename;
             }
             break;
         case Pointer_type:
@@ -978,8 +959,8 @@ static TreeNode* debug_child(TreeNode* t, char* c) {
                 case 'd':
                     return FUNC_TYPE(t).decls;
                 case 'f':
-                    return FUNC_TYPE(t).fname;               
-                
+                    return FUNC_TYPE(t).fname;
+
                 case 'h':
                     return FUNC_TYPE(t).handlers;
             }
@@ -1003,7 +984,7 @@ static TreeNode* debug_child(TreeNode* t, char* c) {
                 case 'c':
                     return ID_DECL(t).context;
                 case 'o':
-                    return ID_DECL(t).overloads;                
+                    return ID_DECL(t).overloads;
             }
             break;
         case Declare_decl:
@@ -1018,7 +999,7 @@ static TreeNode* debug_child(TreeNode* t, char* c) {
                         return IF_STMT(t).else_part;
                     }
                 case 't':
-                    return IF_STMT(t).then_part;              
+                    return IF_STMT(t).then_part;
             }
             break;
         case Init:
@@ -1028,7 +1009,7 @@ static TreeNode* debug_child(TreeNode* t, char* c) {
                 case 'e':
                     return LABELED_STMT(t).expr;
                 case 's':
-                    return LABELED_STMT(t).stmt;           
+                    return LABELED_STMT(t).stmt;
             }
             break;
         case Defaultlabeled_stmt:
@@ -1038,17 +1019,17 @@ static TreeNode* debug_child(TreeNode* t, char* c) {
                 case 'i':
                     return LABELED_STMT(t).id;
                 case 's':
-                    return LABELED_STMT(t).stmt;           
+                    return LABELED_STMT(t).stmt;
             }
             break;
         case Compound_stmt:
             switch (*c) {
                 case 'd':
-                    return COMPOUND_STMT(t).decls; 
+                    return COMPOUND_STMT(t).decls;
                 case 's':
                     return COMPOUND_STMT(t).stmts;
                 case 'c':
-                    return COMPOUND_STMT(t).context;             
+                    return COMPOUND_STMT(t).context;
             }
             break;
         case Expr_stmt:
@@ -1058,7 +1039,7 @@ static TreeNode* debug_child(TreeNode* t, char* c) {
                 case 'e':
                     return DOWHILE_STMT(t).expr;
                 case 's':
-                    return DOWHILE_STMT(t).stmt;           
+                    return DOWHILE_STMT(t).stmt;
             }
             break;
         case While_stmt:
@@ -1066,14 +1047,14 @@ static TreeNode* debug_child(TreeNode* t, char* c) {
                 case 'e':
                     return WHILE_STMT(t).expr;
                 case 's':
-                    return WHILE_STMT(t).stmt;           
+                    return WHILE_STMT(t).stmt;
             }
             break;
         case Try_stmt:
             switch (*c) {
                 case 'e':
                     if (c[1] == 'x') {
-                        return TRY_STMT(t).expr;    
+                        return TRY_STMT(t).expr;
                     } else {
                         return TRY_STMT(t).end_addr;
                     }
@@ -1083,7 +1064,6 @@ static TreeNode* debug_child(TreeNode* t, char* c) {
                     return TRY_STMT(t).handler;
                 case 'b':
                     return TRY_STMT(t).begin_addr;
-                    
             }
             break;
         case Switch_stmt:
@@ -1091,7 +1071,7 @@ static TreeNode* debug_child(TreeNode* t, char* c) {
                 case 'e':
                     return SWITCH_STMT(t).expr;
                 case 's':
-                    return SWITCH_STMT(t).stmt;           
+                    return SWITCH_STMT(t).stmt;
             }
             break;
         case For_stmt:
@@ -1103,7 +1083,7 @@ static TreeNode* debug_child(TreeNode* t, char* c) {
                 case '3':
                     return FOR_STMT(t).expr3;
                 case 's':
-                    return FOR_STMT(t).stmt;    
+                    return FOR_STMT(t).stmt;
             }
             break;
         case Goto_stmt:
@@ -1180,13 +1160,13 @@ void debugger(TreeNode* arg) {
     char buffer[0x1000];
     TreeNode* siblingStack[0x1000];
     int siblingIndex = 1;
-    TreeNode* childStack[0x1000];    
+    TreeNode* childStack[0x1000];
     int childIndex = 1;
     TreeNode* t;
 
     t = arg;
     childStack[0] = siblingStack[0] = NULL;
-    
+
     while (TRUE) {
         fprintf(stderr, "(tdb)");
         fflush(stderr);
@@ -1420,7 +1400,8 @@ TreeNode* duplicate_node(TreeNode* t) {
             copy = make(TREE_CODE(t), TREE_LOCATION(t), BINARY_EXPR(t).operand[0], BINARY_EXPR(t).operand[1]);
             break;
         case Conditional_expr:
-            copy = make(TREE_CODE(t), TREE_LOCATION(t), TERNARY_EXPR(t).operand[0], TERNARY_EXPR(t).operand[1], TERNARY_EXPR(t).operand[2]);
+            copy = make(TREE_CODE(t), TREE_LOCATION(t), TERNARY_EXPR(t).operand[0], TERNARY_EXPR(t).operand[1],
+                        TERNARY_EXPR(t).operand[2]);
             break;
         default:
             __assert("FALSE", "tree.c", 1532);
@@ -1502,10 +1483,10 @@ TreeNode* unqual_type(TreeNode* t) {
             }
         }
     }
-    
+
     if (isPlain) {
         TreeNode* type;
-        
+
         for (type = t, nonStdType = t; type != NULL; type = TREE_TYPE(type)) {
             if (IS_STD_TREE(type)) {
                 break;
@@ -1531,7 +1512,7 @@ TreeNode* make(int code, int location, ...) {
     int i;
 
     va_start(args, location);
-    
+
     switch (code) {
         case Double_type:
         case Longdouble_type:
@@ -1650,7 +1631,7 @@ TreeNode* make(int code, int location, ...) {
         case Dowhile_stmt:
             t = mem_alloc(tree_handle, sizeof(TreeNode_Dowhile_stmt), 4);
             DOWHILE_STMT(t).stmt = va_arg(args, TreeNode*);
-            DOWHILE_STMT(t).expr = va_arg(args, TreeNode*);            
+            DOWHILE_STMT(t).expr = va_arg(args, TreeNode*);
             break;
         case For_stmt:
             t = mem_alloc(tree_handle, sizeof(TreeNode_For_stmt), 4);
@@ -1760,7 +1741,7 @@ TreeNode* make(int code, int location, ...) {
                     break;
                 }
             }
-            
+
             break;
         case Constant:
             type = va_arg(args, TreeNode*);
@@ -1816,7 +1797,7 @@ TreeNode* make(int code, int location, ...) {
                     ARRAY_TYPE(type).align = bit_size[1];
                     t = mem_alloc(tree_handle, 0x18 + string_len * 1, 4); // sizeof(TreeNode_StringConstant) ?
                     TREE_CODE(type) = Array_type;
-                    TREE_TYPE(type) = options[6] ? char_type : uchar_type;
+                    TREE_TYPE(type) = options[OPTION_SIGNED] ? char_type : uchar_type;
                     type->id = ++last_node_id;
                     ARRAY_TYPE(type).index_type = make_iconstant(location, long_type, string_len);
                     memcpy(STRINGCONSTANT(t).value, str, string_len);
@@ -1923,10 +1904,12 @@ float cvt_float_const(TreeNode* arg0) {
     int unused;
     float value;
     MemCtx* savedCtx;
-    
+
     savedCtx = tree_handle;
     tree_handle = general_handle;
-    REALCONSTANT(arg0).value->constVal = make(Constant_special, TREE_LOCATION(arg0), float_type, value = str_to_float(REALCONSTANT(arg0).value->name, TREE_LOCATION(arg0), 4));
+    REALCONSTANT(arg0).value->constVal =
+        make(Constant_special, TREE_LOCATION(arg0), float_type,
+             value = str_to_float(REALCONSTANT(arg0).value->name, TREE_LOCATION(arg0), 4));
     tree_handle = savedCtx;
     return value;
 }
@@ -1938,7 +1921,9 @@ double cvt_double_const(TreeNode* arg0) {
 
     savedCtx = tree_handle;
     tree_handle = general_handle;
-    REALCONSTANT(arg0).value->constVal = make(Constant_special, TREE_LOCATION(arg0), double_type, value = str_to_double(REALCONSTANT(arg0).value->name, TREE_LOCATION(arg0), 4));
+    REALCONSTANT(arg0).value->constVal =
+        make(Constant_special, TREE_LOCATION(arg0), double_type,
+             value = str_to_double(REALCONSTANT(arg0).value->name, TREE_LOCATION(arg0), 4));
     tree_handle = savedCtx;
     return value;
 }
