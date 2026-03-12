@@ -442,7 +442,28 @@ static void func_0041894C(TreeNode* id) {
     }
 }
 
-#pragma GLOBAL_ASM("asm/7.1/functions/cfe/symtab/lookup_id.s")
+// #ifdef NON_EQUIVALENT
+int* lookup_id(Symbol* arg0, TreeNode* arg1, int arg2, int arg3, int arg4, int* arg5, int arg6) {
+    TreeNode* s0;
+    TreeNode* v1;
+    int t1;
+    int t0;
+    int t2;
+    int v0;
+
+    v1 = NULL;
+    t1 = TRUE;
+    t0 = FALSE;
+    t2 = FALSE;
+    s0 = arg0->constVal;
+
+    if (!options[OPTION_CPLUSPLUS] && !(options[OPTION_ANSI_MODE] & 1) && arg1 != NULL && arg2 == 3) {
+        if (TREE_CODE(arg1) >= Double_type && TREE_CODE(arg1) >= Double_type) {}
+    }
+}
+// #else
+// #pragma GLOBAL_ASM("asm/7.1/functions/cfe/symtab/lookup_id.s")
+// #endif
 
 #pragma GLOBAL_ASM("asm/7.1/functions/cfe/symtab/push_scope.s")
 
@@ -450,10 +471,8 @@ static void func_0041894C(TreeNode* id) {
 
 #pragma GLOBAL_ASM("asm/7.1/functions/cfe/symtab/func_004194B4.s")
 
-// #pragma GLOBAL_ASM("asm/7.1/functions/cfe/symtab/func_00419B80.s")
-static int func_00419B80(TreeNode* arg0, TreeNode* arg1) {
-    return 0;
-}
+static int func_00419B80(TreeNode* arg0, TreeNode* arg1);
+#pragma GLOBAL_ASM("asm/7.1/functions/cfe/symtab/func_00419B80.s")
 
 #pragma GLOBAL_ASM("asm/7.1/functions/cfe/symtab/mark_id_used.s")
 
