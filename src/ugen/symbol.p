@@ -3,7 +3,6 @@
 #include "cmplrs/usys.h"
 #include "cmplrs/ucode.h"
 #include "cmplrs/uoptions.h"
-#include "cmplrs/binasm.h"
 #include "emit.h"
 #include "val_util.h"
 
@@ -45,7 +44,6 @@ var
 var
     sym_hash_tab: array[0..255] of ^Symbol;
     non_local_mtag: integer;
-    sdata_max: integer;
     apc: u8;
     excpt: u8;
     source_language: integer; { see cmplrs/uoptions.h for values }
@@ -661,7 +659,7 @@ begin
                 var_s0_3 := ((var_s3^.u.Offset2 - var_s3^.u.Offset) div temp_s6) + 1;
                 if (var_s0_3 >= 16#10000) then begin
                     while (var_s0_3 >= 16#10000) do begin
-                        emit_val(0, vtype, var_s3^.u.Initval, 16#FFFF);
+                        emit_val(NO_LABEL, vtype, var_s3^.u.Initval, 16#FFFF);
                         var_s0_3 := var_s0_3 - 16#FFFF;
                     end;
                 end;
@@ -669,7 +667,7 @@ begin
             end else begin
                 var_a3 := 1;
             end;
-            emit_val(0, vtype, var_s3^.u.Initval, var_a3);
+            emit_val(NO_LABEL, vtype, var_s3^.u.Initval, var_a3);
         end;
         var_s0_2 := var_s3^.u.Offset2 + temp_s6;
         var_s3 := var_s3^.next;
