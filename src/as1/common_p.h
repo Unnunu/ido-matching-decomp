@@ -110,7 +110,10 @@ type
         unk10: integer;
         unk14: integer;
         unk18: integer;
-        unk1C: integer;
+        unk1C: u8;
+        unk1D: registers;
+        unk1E: u8;
+        unk1F: u8;
         unk20: boolean;
         unk21: boolean;
         unk22: boolean;
