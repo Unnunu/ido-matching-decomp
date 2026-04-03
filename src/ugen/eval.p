@@ -42,14 +42,12 @@ type
     end;
 
 var
-    basicint: u8;
     align8: boolean;
     align16: boolean;
     align32: boolean;
     align64: boolean;
     pdefs: ^tree;
     ignore_vreg: boolean;
-    pseudo_leaf: boolean;
     use_real_fp_for_proc: boolean;
     ufsa: boolean;
     cpalias_ok: boolean;
@@ -65,7 +63,6 @@ var
     noalias_on_off: array[registers] of boolean;
     use_real_fp_for_all: boolean;
     use_fp: boolean;
-    framesz_relocatable: boolean;
     home_vararg_reg: boolean;
     generate_again: boolean;
     saved_regs_size: cardinal;
@@ -84,7 +81,6 @@ var
     glevel: u8;
     has_cia_in_file: boolean;
     i_ptrs_for_gp_offset: array[1..20] of integer;
-    first_pmt_offset: integer;
     olevel: u8;
     no_jal_use_jalr_only: boolean;
     opt_cse: u8;
@@ -2453,26 +2449,26 @@ procedure home_parms(arg0: integer);
 label out;
 var
     r: registers;
-    s3: ^tree;
+    pdef: ^tree;
     v0: registers;
     s0: integer;
 begin
-    s3 := pdefs;
-    while s3 <> nil do begin
-        if (s3^.u.Lexlev <> 2) then begin
-            if not pass_in_reg(s3) then begin
+    pdef := pdefs;
+    while pdef <> nil do begin
+        if (pdef^.u.Lexlev <> 2) then begin
+            if not pass_in_reg(pdef) then begin
                 break;
             end;
         
-            v0 := parm_reg(s3);
+            v0 := parm_reg(pdef);
             if v0 in [xfr0..xfr31] then begin
                 saved_regs := saved_regs + [v0];
-                if s3^.u.Length > 4 then begin
-                    Assert((s3^.u.Dtype in [Idt, Kdt, Wdt]) or (s3^.u.Dtype = Qdt));
+                if pdef^.u.Length > 4 then begin
+                    Assert((pdef^.u.Dtype in [Idt, Kdt, Wdt]) or (pdef^.u.Dtype = Qdt));
                     saved_regs := saved_regs + [succ(v0)];
                 end;
             end else begin
-                s0 := (s3^.u.Length + 3) div 4;
+                s0 := (pdef^.u.Length + 3) div 4;
                 while s0 <> 0 do begin
                     saved_regs := saved_regs + [v0];
                     if not is_parm_reg(v0) then begin
@@ -2484,7 +2480,7 @@ begin
             end;
         end;
         
-        s3 := s3^.next;
+        pdef := pdef^.next;
     end;
 
 out:

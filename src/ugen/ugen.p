@@ -54,14 +54,12 @@ procedure close_bin_file(); external;
 procedure output_decls(); external;
 
 var
-    addr_dtype: Datatype;
     align8: boolean;
     align16: boolean;
     align32: boolean;
     align64: boolean;
     apc: boolean;
     ascii_out: boolean;
-    basicint: boolean;
     cpalias_ok: boolean;
     excpt: boolean;
     first_ent: boolean;
@@ -80,7 +78,6 @@ var
     tree_heap: pointer;
     tree_heap_mark: integer;
     ufsa: boolean;
-    unitsperaddr: integer;
     use_real_fp_for_all: boolean;
 
 
@@ -378,7 +375,7 @@ begin
         print_warnings := true;
         max_stack := -1;
         opcode_arch := ARCH_32;
-        basicint := false;
+        basicint := 0;
         addr_dtype := Adt;
         unitsperaddr := 4;
         fp32regs := false;
@@ -656,7 +653,7 @@ begin
                             if (ARG_OPT(3, '4') and ARG_OPT(4, 'd') and ARG_OPT(5, 'a') and ARG_OPT(6, 't') and ARG_OPT(7, 'a') and ARG_OPT(8, ' ')) then begin
                                 isa := ISA_MIPS3;
                                 opcode_arch := ARCH_64;
-                                basicint := true;
+                                basicint := 1;
                                 addr_dtype := Wdt;
                                 unitsperaddr := 8;
                             end else goto default;

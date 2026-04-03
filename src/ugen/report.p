@@ -8,7 +8,6 @@ var
 	olevel: u8;
 	opt_cse: u8;
 	opt_labels: boolean;
-	opt_parms: u8;
 	tail_call_opt: u8;
 
 /* Special type for ugen */

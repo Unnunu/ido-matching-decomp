@@ -42,7 +42,7 @@ var
     temp: cardinal;
     var_s0: cardinal;
 begin
-    temp :=  rshift(arg1, 3);
+    temp := rshift(arg1, 3);
 
     if (temp <> 0) then begin
         var_s0 := temp;
@@ -133,7 +133,7 @@ begin
 
     case u.Opc of
         Ucia:
-            write(f, " ival=",  u.Constval.ival:1);
+            write(f, " ival=", u.Constval.ival:1);
         Uldc:
             begin
                 if (u.Dtype in [Idt, Kdt]) then begin

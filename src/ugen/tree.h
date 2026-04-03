@@ -1,8 +1,7 @@
 #ifndef TREE_H
 #define TREE_H
 #include "common.h"
-#include "cmplrs/usys.h"
-#include "cmplrs/ucode.h"
+
 type
   Ptree = ^tree;
   tree = packed record

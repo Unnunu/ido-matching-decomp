@@ -2,6 +2,8 @@
 #define COMMON_H
 
 #include "cmplrs/binasm.h"
+#include "cmplrs/usys.h"
+#include "cmplrs/ucode.h"
 
 #define ALIGN_UP(x, v) ((((x) + (v) - 1) div (v)) * (v))
 
@@ -55,6 +57,13 @@ var
     uses_gp: boolean;
     pic_level: integer;
     source_language: integer; { see cmplrs/uoptions.h for values }
+    first_pmt_offset: integer;
+    basicint: u8;
+    addr_dtype: Datatype;
+    unitsperaddr: integer;
+    pseudo_leaf: boolean;
+    opt_parms: boolean;
+    framesz_relocatable: boolean;
 
 { external functions }
 

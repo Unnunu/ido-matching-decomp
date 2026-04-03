@@ -6,8 +6,6 @@
 {**********************************************************************}
 
 #include "common.h"
-#include "cmplrs/usys.h"
-#include "cmplrs/ucode.h"
 #include "val_util.h"
 #include "emit.h"
 #include "report.h"

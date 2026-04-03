@@ -53,7 +53,6 @@ var
 
 var
     calls: integer;
-    pseudo_leaf: boolean;
     expr_count: 0..5;
     exprs: array [1..5] of ^tree;
     load_count: 0..5;
@@ -77,7 +76,6 @@ var
     tail_call_opt: boolean;
     ignore_vreg: boolean;
     nooffsetopt: boolean;
-    addr_dtype: Datatype;
 
     { .data }
     expression_opcs: array [Uopcode] of boolean := [
@@ -1104,7 +1102,7 @@ restart:
                 if IS_RETURN_ATTR(a^.u.Extrnal) then begin
                     if IS_GOTO_ATTR(a^.u.Extrnal) then begin
                         calls := calls + 1;
-                        pseudo_leaf := False;
+                        pseudo_leaf := false;
                     end;
                 end else begin
                     calls := calls + 1;
@@ -1991,20 +1989,18 @@ var
     ret: integer;
     check: boolean;
 begin
-
     Assert(arg0^.u.mtype <> Tmt);
-    if (arg0^.u.mtype = Amt) then begin
+
+    if arg0^.u.mtype = Amt then begin
         ret := check_amt(arg0);
-        if (ret <> -1) then begin
+        if ret <> -1 then begin
             arg0^.u.Offset := ret;
             arg0^.u.Mtype := Rmt;
         end;
     end else if (arg0^.u.mtype in [Mmt, Pmt]) then begin
-        if not (ignore_vreg) then begin
+        if not ignore_vreg then begin
             check := check_vreg(arg0, false);
-            return;
-        end;
-        if (get_domtag() <> 0) then begin
+        end else if get_domtag() <> 0 then begin
             find_vreg_mtag(arg0);
         end;
     end else if (arg0^.u.mtype = Smt) then begin

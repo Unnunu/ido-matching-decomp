@@ -1,7 +1,5 @@
 #include "common.h"
 #include "report.h"
-#include "cmplrs/usys.h"
-#include "cmplrs/ucode.h"
 #include "cmplrs/uoptions.h"
 #include "emit.h"
 #include "val_util.h"

@@ -20,9 +20,7 @@ procedure emit_optimize_level(arg0: integer); forward;
 
 var
     ascii_out: boolean;
-    basicint: u8;
     excpt: boolean;
-    framesz_relocatable: boolean;
     home_vararg_reg: boolean;
     i_ptrs_for_gp_offset: array[1..20] of integer;
     init_dynmem: boolean;

@@ -1,171 +1,182 @@
 #include "tree.h"
 #include "tree_utils.h"
 #include "report.h"
+#include "ugen_regdef.h"
 
 var
-    first_pmt_offset: integer;
-    basicint: extern u8;
-    pars: array [0..16] of integer;
-    fix_amt: array [0..4] of boolean;
-    addr_dtype: Datatype;
-    unitsperaddr: integer;
+    fix_amt: array [0..3] of boolean;
+    pars: array [0..3] of integer;
 
-function pass_in_reg(arg0: ^Tree): boolean;
+{ Эта функция вызывается либо для Upar, то есть параметра для вызова другой функции, 
+либо для Updef, то есть входного параметра текущей функции
+Для них Ival - это смещение в пространстве регистров, т.е. 0 - это gpr_zero, 4 - gpr_at  и так далее.
+Соответственно, если Ival равно -1, то этот параметр нельзя передавать в регистре }
+function pass_in_reg(parm: PTree): boolean;
 begin
-    Assert(arg0^.u.Opc in [Upar, Updef]);
-    return (arg0^.u.Constval.Ival + 1) <> 0;
+    Assert(parm^.u.Opc in [Upar, Updef]);
+    return parm^.u.Constval.Ival <> -1;
 end;
 
-function parm_reg(arg0: ^Tree): registers;
+function parm_reg(parm: PTree): registers;
 begin
-    Assert(arg0^.u.Opc in [Upar, Updef, Urpar, Uvreg]);
+    Assert(parm^.u.Opc in [Upar, Updef, Urpar, Uvreg]);
 
-    if (arg0^.u.Constval.Ival = -1) then begin
+    if parm^.u.Constval.Ival = -1 then begin
         return xnoreg;
     end;
 
-    if (basicint = 0) then begin
-        return registers(arg0^.u.Constval.Ival div 4);
+    if basicint = 0 then begin
+        return registers(parm^.u.Constval.Ival div 4);
     end else begin
-        return registers(arg0^.u.Constval.Ival div 8);
+        return registers(parm^.u.Constval.Ival div 8);
     end;
 end;
 
 
-procedure map_pdefs_to_regs(arg0: ^Tree; arg1: integer);
+procedure map_pdefs_to_regs(pdef_list: PTree; stdarg_size: integer);
 var
-    var_v0: integer;
-    var_v1: cardinal;
+    parm_offset: integer;
+    i: cardinal;
 begin
-    for var_v1 := 1 to n_fp_parm_regs do begin
-        if arg0 = nil then begin
+    for i := 1 to n_fp_parm_regs do begin
+        if pdef_list = nil then begin
             return;
         end;
             
-        Assert(arg0^.u.Opc = Updef);
+        Assert(pdef_list^.u.Opc = Updef);
 
-        if not (arg0^.u.Dtype in [Qdt, Rdt, Xdt]) then begin
+        if not (pdef_list^.u.Dtype in [Qdt, Rdt, Xdt]) then begin
             break;
         end;
 
-        if (arg1 <> -1) and (arg1 < integer((var_v1 - 1) * 2) * 4) then begin
+        if (stdarg_size <> -1) and (stdarg_size < integer((i - 1) * 2) * 4) then begin
             break;
         end;
 
-        arg0^.u.Constval.dwval_h := integer((var_v1 - 1) * 2) * 4 + 16#B0;
-        arg0 := arg0^.next;                
+        pdef_list^.u.Constval.Ival := integer((i - 1) * 2) * 4 + ord(fpr_fa0) * 4;
+        pdef_list := pdef_list^.next;                
     end;
 
-    while (arg0 <> nil) do begin
-        Assert(arg0^.u.Opc = Updef);
-        var_v0 := abs(arg0^.u.Offset - first_pmt_offset);
+    while pdef_list <> nil do begin
+        Assert(pdef_list^.u.Opc = Updef);
+        
+        parm_offset := abs(pdef_list^.u.Offset - first_pmt_offset);
 
         if (basicint = 0) then begin
-            if (var_v0 < n_parm_regs * 4) then begin
-                arg0^.u.Constval.dwval_h := var_v0 + 16;
+            if parm_offset < n_parm_regs * 4 then begin
+                pdef_list^.u.Constval.Ival := parm_offset + 16;
             end else begin
-                arg0^.u.Constval.dwval_h := -1;
+                pdef_list^.u.Constval.Ival := -1;
             end;
         end else begin
-            if (var_v0 < (n_parm_regs * 8)) then begin
-                arg0^.u.Constval.dwval_h := var_v0 + 32;
+            if parm_offset < (n_parm_regs * 8) then begin
+                pdef_list^.u.Constval.Ival := parm_offset + 32;
             end else begin
-                arg0^.u.Constval.dwval_h := -1;
+                pdef_list^.u.Constval.Ival := -1;
             end;
         end;
-        arg0 := arg0^.next;
+
+        pdef_list := pdef_list^.next;
     end;
 end;
 
 
-procedure map_pars_to_regs(arg0: ^Tree; arg1: integer);
+procedure map_pars_to_regs(stmt: PTree; num_stdargs: integer);
 label done;
 var
     i: cardinal;
-    var_a3: integer;
-    a: integer;
-    v0: ^Tree;
+    parm_offset: integer;
+    num_pars: integer;
+    mst: ^Tree;
 begin
-
-    assert(arg0^.u.Opc = Umst);
-    arg0^.u.I1 := 0;
-    v0 := arg0;
+    assert(stmt^.u.Opc = Umst);
+    stmt^.u.I1 := 0;
+    mst := stmt;
     
-    a := 3;
-    for i := 0 to a do pars[i] := -1;
+    num_pars := 4;
+    for i := 0 to num_pars - 1 do pars[i] := -1;
 
-    arg0 := arg0^.next;
+    stmt := stmt^.next;
     for i := 1 to n_fp_parm_regs do begin
-        {Get upar and upmov? }
-        if (arg0^.u.Opc in [Ucia, Ucup, Uicuf, Urcuf]) then goto done;
-        while (arg0^.u.Opc <> Upar) and (arg0^.u.Opc <> Upmov) do begin
-            if (arg0^.u.Opc in [Ucia, Ucup, Uicuf, Urcuf]) then goto done;
-            arg0 := arg0^.next;
+        
+        if (stmt^.u.Opc in [Ucia, Ucup, Uicuf, Urcuf]) then begin
+            goto done;
         end;
 
-        if not ((arg0^.u.Dtype in [Qdt, Rdt, Xdt])) then break;
-        if (((arg1 <> -1) and (i >= arg1))) then break;
-        var_a3 := abs(arg0^.u.Offset - first_pmt_offset);
+        while (stmt^.u.Opc <> Upar) and (stmt^.u.Opc <> Upmov) do begin
+            if (stmt^.u.Opc in [Ucia, Ucup, Uicuf, Urcuf]) then begin
+                goto done;
+            end;
+            stmt := stmt^.next;
+        end;
 
-        arg0^.u.Offset2 := (i  + 21) * 8;
-        pars[var_a3 div 4] := arg0^.u.Offset2;
-        arg0 := arg0^.next;
+        if not (stmt^.u.Dtype in [Qdt, Rdt, Xdt]) then begin
+            break;
+        end;
+        
+        if (num_stdargs <> -1) and (i >= num_stdargs) then begin
+            break;
+        end;
+
+        parm_offset := abs(stmt^.u.Offset - first_pmt_offset);
+
+        stmt^.u.Offset2 := (i - 1) * 8 + ord(fpr_fa0) * 4;
+        pars[parm_offset div 4] := stmt^.u.Offset2;
+        stmt := stmt^.next;
     end;
 
-    while not (arg0^.u.Opc in [Ucia, Ucup, Uicuf, Urcuf]) do begin
-        while (arg0^.u.Opc <> Upar) and (arg0^.u.Opc <> Upmov) do begin
-            if arg0^.u.Opc in [Ucia, Ucup, Uicuf, Urcuf] then goto done;
-            arg0 := arg0^.next;
+    while not (stmt^.u.Opc in [Ucia, Ucup, Uicuf, Urcuf]) do begin
+        while (stmt^.u.Opc <> Upar) and (stmt^.u.Opc <> Upmov) do begin
+            if stmt^.u.Opc in [Ucia, Ucup, Uicuf, Urcuf] then begin
+                goto done;
+            end;
+            stmt := stmt^.next;
         end;
 
-        var_a3 := abs(arg0^.u.Offset - first_pmt_offset);
-        if basicint = 0 then begin
-        
-            if (arg0^.u.Opc <> Upmov) then begin
-                if (var_a3 < (n_parm_regs * 4)) then begin
-                    arg0^.u.Offset2 := var_a3 + 16;
-                    pars[var_a3 div 4] := arg0^.u.Offset2;
+        parm_offset := abs(stmt^.u.Offset - first_pmt_offset);
+        if basicint = 0 then begin        
+            if stmt^.u.Opc <> Upmov then begin
+                if parm_offset < n_parm_regs * 4 then begin
+                    stmt^.u.Offset2 := parm_offset + 4 * ord(gpr_a0);
+                    pars[parm_offset div 4] := stmt^.u.Offset2;
                 end else begin
-                    arg0^.u.Offset2 := -1;
+                    stmt^.u.Offset2 := -1;
                 end;
             end;
         end else begin
-            if (arg0^.u.Opc <> Upmov) then begin
-                if (var_a3 < (n_parm_regs * 8)) then begin
-                    arg0^.u.Offset2 := var_a3 + 32;
-                    pars[var_a3 div 8] := arg0^.u.Offset2;
+            if stmt^.u.Opc <> Upmov then begin
+                if parm_offset < n_parm_regs * 8 then begin
+                    stmt^.u.Offset2 := parm_offset + 8 * ord(gpr_a0);
+                    pars[parm_offset div 8] := stmt^.u.Offset2;
                 end else begin
-                    arg0^.u.Offset2 := -1;
+                    stmt^.u.Offset2 := -1;
                 end;
             end;
         end;
-        arg0 := arg0^.next;
+        stmt := stmt^.next;
     end;
     
 done:
-    if (arg0^.u.Opc = Ucup) and (IS_REALLOC_ARG_ATTR(arg0^.u.Extrnal)) then begin
-        v0^.u.I1 := 1;
+    if (stmt^.u.Opc = Ucup) and IS_REALLOC_ARG_ATTR(stmt^.u.Extrnal) then begin
+        mst^.u.I1 := 1;
     end;
 end;
 
-function check_amt(arg0: ^Tree): integer;
-var
-    temp: integer;
+function check_amt(arg0: PTree): integer;
 begin
-  
     Assert(arg0^.u.Offset >= 0);
-    temp := 4;
-    if (basicint = 0) then begin
-        if ((arg0^.u.Offset >= (n_parm_regs * 4)) or (arg0^.u.Offset >= (n_fp_parm_regs * 2 * temp))) then begin
+
+    if basicint = 0 then begin
+        if (arg0^.u.Offset >= n_parm_regs * 4) or (arg0^.u.Offset >= cardinal(n_fp_parm_regs * 2) * 4) then begin
             return -1;
         end;
         return pars[arg0^.u.Offset div 4];
+    end else begin
+        if (arg0^.u.Offset >= n_parm_regs * 8) or (arg0^.u.Offset >= cardinal(n_fp_parm_regs * 2) * 4) then begin
+            return -1;
+        end;
+        return pars[arg0^.u.Offset div 8];
     end;
-
-    if (arg0^.u.Offset >= (n_parm_regs * 8)) or ((arg0^.u.Offset >= (n_fp_parm_regs * 2 * temp))) then begin
-        return -1;
-    end;
-    return pars[arg0^.u.Offset div 8];
 end;
 
 procedure check_amt_ref(arg0: ^tree);

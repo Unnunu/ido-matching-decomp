@@ -8,7 +8,6 @@ var
     olevel: u8;
     opt_cse: u8;
     opt_labels: boolean;
-    opt_parms: u8;
     tail_call_opt: u8;
 
 
@@ -26,7 +25,7 @@ begin
     begin
         opt_cse := 1;
         opt_labels := false;
-        opt_parms := 1;
+        opt_parms := true;
         ignore_vreg := 0;
         tail_call_opt := 0;
     end;
@@ -39,7 +38,7 @@ begin
         end;
      
         opt_labels := (arg1 = 0) or (arg1 = 3);
-        opt_parms := 1;
+        opt_parms := true;
         ignore_vreg := 0;
         tail_call_opt := 0;
         end;
@@ -54,7 +53,7 @@ begin
         end;
   
         opt_labels := (arg1 = 0) or (arg1 = 3);
-        opt_parms := 0;
+        opt_parms := false;
         ignore_vreg := 1;
         if (arg0 >= 3) and (tail_call_opt <> 0) then begin
             tail_call_opt := 1;

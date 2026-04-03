@@ -1,6 +1,4 @@
-#include "cmplrs/usys.h"
 #include "cmplrs/allocator.h"
-#include "cmplrs/ucode.h"
 #include "common.h"
 #include "ibuffer.h"
 #include "report.h"
