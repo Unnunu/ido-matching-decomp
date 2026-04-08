@@ -7,7 +7,6 @@
 #include "mem.h"
 #include "linklist.h"
 #include "tree.h"
-#include "tree.h"
 
 #define GET_SYM_CAT(x) (x != 0 ? (x == -1 ? "typedef" : "keyword") : "regular")
 
@@ -40,6 +39,16 @@ typedef struct FmtArr {
     char* unk_00;
     int unk_04;
 } FmtArr;
+
+typedef struct Scope {
+    /* 0x00 */ TreeNode* unk_00;
+    /* 0x04 */ unsigned int level;
+    /* 0x08 */ struct Scope* parent;
+    /* 0x0C */ struct Scope* child;
+    /* 0x10 */ int unk_10;
+    /* 0x14 */ int unk_14;
+    /* 0x18 */ TreeNode* unk_18;
+} Scope; // size = 0x1C
 
 extern short act_to_imp[];
 extern short imp_to_act[];
@@ -90,7 +99,7 @@ extern TreeNode* longdouble_type;
 extern TreeNode* one_constant;
 extern TreeNode* zero_constant;
 extern TreeNode* ellipsis;
-extern int last_stdtree_id;
+extern unsigned int last_stdtree_id;
 extern unsigned short options[];
 extern unsigned long long __ULONGLONG_MAX;
 extern long long __LONGLONG_MAX;
@@ -113,9 +122,13 @@ extern MemCtx* tree_handle;
 extern MemCtx* temp_handle;
 extern Symbol* builtins[];
 extern Symbol* anonymous;
+extern Scope* function_scope;
+extern Scope* current_scope;
+extern Scope* file_scope;
+extern void* current_function;
 
 int real_file_line(int, char**, int*, int);
-int __assert(char*, char*, int);
+void __assert(char*, char*, int);
 void register_file(char*, int);
 float str_to_float(char* arg0, int arg1, int arg2);
 double str_to_double(char* arg0, int arg1, int arg2);
@@ -123,7 +136,6 @@ Symbol* string_to_symbol(char*, size_t);
 unsigned int sizeof_type(int);
 char* get_type_name(int);
 int loc_to_cppline(int);
-void catchall(void);
 int lint(int argc, char** argv);
 int cfe(int argc, char** argv);
 int cpp(int argc, char** argv);
@@ -133,5 +145,10 @@ void set_def_member_pack(int);
 void cpp_symentry_setMaxMacroRecursionDepth(int);
 void* get_runtime_id(char*, TreeNode*, int);
 void declarator(TreeNode* id, TreeNode* context, int sclass, int oclass, int attr, TreeNode* type);
-void enter_id(TreeNode* id);
+void mips_st(TreeNode*);
+void mips_st_extundefined(TreeNode*);
+void lint_setref(TreeNode*, int, int);
+void lint_checks(TreeNode*);
+int type_compatible(TreeNode* arg0, TreeNode* arg1, int arg2);
+
 #endif

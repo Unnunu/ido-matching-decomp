@@ -46,6 +46,7 @@ typedef struct TreeNodeList {
 #include "symtab.h"
 #include "screener.h"
 #include "tree.h"
+#include "os.h"
 #include "unknown.h"
 
 #endif
