@@ -106,7 +106,7 @@ var
     treeDumpFile: Text; {File where the different tree phases are dumped/logged}
 var
     ugenTempFileName: Filename; {sp19C8}
-    temp_fd: integer; {sp19C4}
+    ugenTempFileFd: integer; {sp19C4}
     pad1: integer;
     sp15C0: Filename; {sp15C0}
     outputFileName: Filename;
@@ -154,43 +154,43 @@ var
 
     procedure func_0044B2EC(arg0: ^Tree);
     var
-        var_s0: ^tree;
+        iter: ^tree;
     begin
-        var_s0 := arg0;
-        while (var_s0 <> nil) do begin
-            if (((var_s0^.u.Opc = Ulab) and (var_s0^.u.Lexlev <> GOOB_TARGET)) or (var_s0^.u.Opc = Uclab)) then begin
-                var_s0^.u.I1 := gen_label_id();
+        iter := arg0;
+        while (iter <> nil) do begin
+            if (((iter^.u.Opc = Ulab) and (iter^.u.Lexlev <> GOOB_TARGET)) or (iter^.u.Opc = Uclab)) then begin
+                iter^.u.I1 := gen_label_id();
             end;
-            var_s0 := var_s0^.next;
+            iter := iter^.next;
         end;
     end;
 
-    procedure func_0044B384(opt: char; arg1: integer);
+    procedure func_0044B384(opt: char; regs: integer);
     begin
         case opt of                                 /* irregular */
             CASE_ARG('a')
             begin
-                n_parm_regs := arg1;
+                n_parm_regs := regs;
             end;
 
             CASE_ARG('g')
             begin
-                if (arg1 < 4) then begin
+                if (regs < 4) then begin
                     report_error(Internal, 138, "ugen.p", "insufficient code generator registers");
                     n_cg_regs := 4;
                 end else begin
-                    n_cg_regs := arg1; 
+                    n_cg_regs := regs; 
                 end;
             end;
 
             CASE_ARG('r')
             begin
-                n_unsaved_regs := arg1;
+                n_unsaved_regs := regs;
             end;
 
             CASE_ARG('e')
             begin
-                n_saved_regs := arg1;
+                n_saved_regs := regs;
             end;
 
             CASE_ARG(' ')
@@ -202,7 +202,7 @@ var
     end;
 
     
-    procedure func_0044B640(opt: char; regs: integer);
+    procedure set_fp_regs(opt: char; regs: integer);
     begin
         case (opt) of
             CASE_ARG('a')
@@ -285,9 +285,9 @@ var
 
         ugenTempFileName[19] := chr(0);
         fd := mktemp(ugenTempFileName);
-        temp_fd := fd;
+        ugenTempFileFd := fd;
         
-        if (temp_fd = 0) then begin
+        if (ugenTempFileFd = 0) then begin
             report_error(Internal, 254, "ugen.p", "No suitable file can be created");
         end;    
     end;
@@ -535,7 +535,7 @@ begin
                                 index := index + 1;
                                 var_s0 := arg[6];
                                 argv(index, arg);
-                                func_0044B640(var_s0, str_atoi(arg));
+                                set_fp_regs(var_s0, str_atoi(arg));
                             end else begin
                                 if (streq(arg, "-fp32regs")) then begin
                                     fp32regs := true;
