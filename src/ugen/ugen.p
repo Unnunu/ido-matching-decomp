@@ -25,8 +25,9 @@
 
 {Special types for ugen.p }
 type
-    debug_levels = 0..4 of integer;
-    opt_levels = 0..3 of integer;
+    { Required to match }
+    ugen_debug_levels = first(DebugLevels)..last(DebugLevels) of integer;
+    ugen_opt_levels = first(OptLevels)..last(OptLevels) of integer;
     ugen_str =  packed array [1..12] of char; {Used for printing out the ucode parse tree phase (translate, build, etc..)}
     opt_str = packed array [1..32] of char; {Used for checking the options}
 
@@ -37,7 +38,7 @@ function mktemp(var path: Filename): integer; external;
 procedure unlink(var path: Filename); external;
 function getenv(var arg0: Filename): integer; external;
 procedure output_inst_bin(var a0: binasm; a1: cardinal; var a2: binasm; a3: cardinal); external;
-procedure cat_files(var a1: Filename; var a2: Filename); external; 
+procedure cat_files(var a1: Filename; var a2: Filename); external;
 procedure open_bin_file(var str: Filename); external;
 procedure set_domtag(arg0: boolean); external;
 
@@ -46,7 +47,7 @@ procedure labelopt(a0: ^Tree; var a1: Text; debugTree: boolean; arg2: boolean); 
 procedure initialize_tree(); external;
 procedure clear_sym_tab(); external;
 procedure init_build(); external;
-function build_tree(verbose: boolean): pointer; external; 
+function build_tree(verbose: boolean): pointer; external;
 function translate_tree(a: ^Tree): pointer; external;
 procedure init_eval(); external;
 procedure eval(arg0: ^Tree; arg1: registers); external;
@@ -72,7 +73,7 @@ var
     no_jal_use_jalr_only: boolean;
     non_local_mtag: integer;
     nooffsetopt: boolean;
-    opt_labels: u8;
+    opt_labels: boolean;
     print_warnings: boolean;
     saw_cap_g: boolean;
     sgi_unsigned_conv: boolean;
@@ -94,50 +95,51 @@ var
     end; \
 
 
-procedure set_opts(arg0: opt_levels; arg1: debug_levels); external;
+procedure set_opts(arg0: OptLevels; arg1: DebugLevels); external;
 
 {Program block}
 
 program ugen;
 
-label default;
-var    
+label default; { original name: badoption }
+var
     treeDumpFileName: Filename; {Name of the file where the different tree phases are dumped/logged}
     treeDumpFile: Text; {File where the different tree phases are dumped/logged}
 var
-    ugenTempFileName: Filename; {sp19C8}
-    temp_fd: integer; {sp19C4}
+    ugenTempFileName: Filename;
+    ugenTempFileFd: integer;
     pad1: integer;
-    sp15C0: Filename; {sp15C0}
+    inputFileName: Filename;
     outputFileName: Filename;
-    spDC0: Filename; {spD40}
-    sp9C0: Filename; {sp9C0}
-    stFileName: st_string; {Symbol table file name}
-    debugTree: boolean; {sp93F}
-    verbose: boolean; {sp93E}
-    arg: Filename; {sp53E}
-    sp534: Text; {sp534}
-    var_s1: integer; {sp530}
-    var_a0: integer;
-    var_s2: cardinal;
-    var_v0_4: integer;
-    var_v0_3: integer;
-    sp51C: debug_levels; {sp51C}
-    sp518: opt_levels; {sp518}
-    var_s0: char;
-    debugLabelOptPhase: boolean; {debugLabelOptPhase}
+    asmOutputFilePath: Filename;
+    treeUcodeFileName: Filename;
+    stFileName: st_string;
+    debugTree: boolean;
+    verbose: boolean;
+    arg: Filename;
+    asmOutputFile: Text;
+    inputFileNameLen: integer;
+    i: integer;
+    pad2: cardinal;
+    ugenTempFileNameLen: integer;
+    nameLen: integer;
+    debugLevel: ugen_debug_levels;
+    optLevel: ugen_opt_levels;
+    reg: char;
+    debugLabelOptPhase: boolean;
     useTempFile: boolean; {sp515}
     warnLevel: cardinal; {sp510}
-    xpg_env: boolean; {sp50F}
-    pad6: integer;
+    useXpgEnv: boolean; {sp50F}
+    pad3: integer;
     xpgEnvVar: Filename;
     index: cardinal;
     pTree: ^Tree;
 
     { Inner functions.. }
 
-    function str_atoi(var arg0: Filename): integer; 
-    var 
+    { Original name: atoi }
+    function str_atoi(var arg0: Filename): integer;
+    var
         len: integer;
         value: integer;
     begin
@@ -152,45 +154,47 @@ var
         return value;
     end;
 
-    procedure func_0044B2EC(arg0: ^Tree);
+    { Original name: assign_dense_labels }
+    procedure assign_dense_labels(arg0: ^Tree);
     var
-        var_s0: ^tree;
+        iter: ^tree;
     begin
-        var_s0 := arg0;
-        while (var_s0 <> nil) do begin
-            if (((var_s0^.u.Opc = Ulab) and (var_s0^.u.Lexlev <> GOOB_TARGET)) or (var_s0^.u.Opc = Uclab)) then begin
-                var_s0^.u.I1 := gen_label_id();
+        iter := arg0;
+        while (iter <> nil) do begin
+            if (((iter^.u.Opc = Ulab) and (iter^.u.Lexlev <> GOOB_TARGET)) or (iter^.u.Opc = Uclab)) then begin
+                iter^.u.I1 := gen_label_id();
             end;
-            var_s0 := var_s0^.next;
+            iter := iter^.next;
         end;
     end;
 
-    procedure func_0044B384(opt: char; arg1: integer);
+    { Original name: process_reg }
+    procedure process_reg(opt: char; regs: integer);
     begin
-        case opt of                                 /* irregular */
+        case opt of
             CASE_ARG('a')
             begin
-                n_parm_regs := arg1;
+                n_parm_regs := regs;
             end;
 
             CASE_ARG('g')
             begin
-                if (arg1 < 4) then begin
+                if (regs < 4) then begin
                     report_error(Internal, 138, "ugen.p", "insufficient code generator registers");
                     n_cg_regs := 4;
                 end else begin
-                    n_cg_regs := arg1; 
+                    n_cg_regs := regs;
                 end;
             end;
 
             CASE_ARG('r')
             begin
-                n_unsaved_regs := arg1;
+                n_unsaved_regs := regs;
             end;
 
             CASE_ARG('e')
             begin
-                n_saved_regs := arg1;
+                n_saved_regs := regs;
             end;
 
             CASE_ARG(' ')
@@ -201,8 +205,8 @@ var
         end;
     end;
 
-    
-    procedure func_0044B640(opt: char; regs: integer);
+    { Original name: process_fp_reg }
+    procedure process_fp_reg(opt: char; regs: integer);
     begin
         case (opt) of
             CASE_ARG('a')
@@ -231,7 +235,7 @@ var
                     n_fp_parm_regs := 0;
                     n_unsaved_fp_regs := 0;
                     n_saved_fp_regs := 0;
-                    
+
                     if (regs < 2) then begin
                         report_error(Internal, 182, "ugen.p", "insufficient code generator fp registers ");
                         n_fp_cg_regs := 2;
@@ -244,7 +248,8 @@ var
         end;
     end;
 
-    procedure dump_tree(t: ^Tree; phase: ugen_str); 
+    { Original name: dump_tree }
+    procedure dump_tree(t: ^Tree; phase: ugen_str);
     begin
         if (treeDumpFileName[1] <> chr(0)) then begin
             writeln(treeDumpFile, "Tree dump after ", phase:0);
@@ -260,6 +265,7 @@ var
         end;
     end;
 
+    { original name: filenameassign }
     procedure copy_filename(var dest: Filename; src: opt_str);
     var
         len: integer;
@@ -276,7 +282,7 @@ var
         end;
     end;
 
-    
+    { Original name: make_temp_file }
     procedure create_temp_file();
     var
         fd: integer;
@@ -285,19 +291,21 @@ var
 
         ugenTempFileName[19] := chr(0);
         fd := mktemp(ugenTempFileName);
-        temp_fd := fd;
-        
-        if (temp_fd = 0) then begin
+        ugenTempFileFd := fd;
+
+        if (ugenTempFileFd = 0) then begin
             report_error(Internal, 254, "ugen.p", "No suitable file can be created");
-        end;    
+        end;
     end;
 
+    { Original name: remove_temp_file }
     procedure unlink_temp_file();
     begin
         unlink(ugenTempFileName);
     end;
 
-    
+
+    { Original name: filenameeq }
     function streq(var str1: Filename; str2: opt_str): boolean;
     var pos: integer;
     begin
@@ -312,28 +320,28 @@ var
     end;
 
 begin
-    xpg_env := false;
+    useXpgEnv := false;
 
-    xpgEnvVar := "_XPG";    
+    xpgEnvVar := "_XPG";
     xpgEnvVar[5] := chr(0);
 
     if (getenv(xpgEnvVar) <> 0) then begin
-        xpg_env := true;
+        useXpgEnv := true;
     end;
 
     if (argc < 2) then begin
         writeln(err, "Usage is: ugen [-o binfile] [-l listfile] [-e dumpfile] [-t symbolfilename] [-d] [-trapuv] [-G smallsize] [-p] file.F");
         return 0;
     end else begin
-        sp15C0[1] := chr(0);
+        inputFileName[1] := chr(0);
         sdata_max := 8;
 
         {Null terminate the strings?}
-        
+
         outputFileName[1] := chr(0);
-        spDC0[1] := chr(0);
+        asmOutputFilePath[1] := chr(0);
         lsb_first := false;
-        sp9C0[1] := chr(0);
+        treeUcodeFileName[1] := chr(0);
         stFileName[1] := chr(0);
         fp_initialized := 0;
         ugenTempFileName[1] := chr(0);
@@ -349,8 +357,8 @@ begin
         init_dynmem := false;
         debugLabelOptPhase := false;
         use_real_fp_for_all := false;
-        sp51C := 0;
-        sp518 := 1;
+        debugLevel := DEBUG_LEVEL_g0;
+        optLevel := OPT_LEVEL_O1;
         debug_ugen := false;
         warnLevel := ord(Fix);
         index := 1;
@@ -383,7 +391,7 @@ begin
         unitsperaddr := 4;
         fp32regs := false;
 
-        
+
 
         if (argc >= 2) then begin
             repeat
@@ -412,14 +420,14 @@ begin
                                 end else if (ARG_OPT(5, 'm')) then begin
                                     ufsm := true;
                                 end else goto default
-                                
+
                             end else if (ARG_OPT(3, ' ')) then begin
                                 if ((index + 1) = argc) then begin
                                     writeln(err, "filename required after -u");
                                     halt(1);
                                 end;
                                 index := index + 1;
-                                argv(index, sp9C0);
+                                argv(index, treeUcodeFileName);
                             end else goto default;
 
                         CASE_ARG('l')
@@ -429,7 +437,7 @@ begin
                                     halt(1);
                                 end;
                                 index := index + 1;
-                                argv(index, spDC0);
+                                argv(index, asmOutputFilePath);
                                 ascii_out := true; {Assembly output: TRUE}
                             end else goto default;
 
@@ -443,7 +451,7 @@ begin
                                 index := index + 1;
                                 argv(index, ugenTempFileName);
                                 useTempFile := true;
-                                
+
                             end else if ((ARG_OPT(3, 'r')) and (ARG_OPT(4, 'a')) and (ARG_OPT(5, 'p')) and (ARG_OPT(6, 'u')) and (ARG_OPT(7, 'v'))) then begin
                                 init_dynmem := true;
                             end else if (ARG_OPT(3,  ' ')) then begin
@@ -456,19 +464,20 @@ begin
                             end else goto default;
 
                         CASE_ARG('e')
+                        begin
                             if (ARG_OPT(3,  ' ')) then begin
                                 if ((index + 1) = argc) then begin
                                     writeln(err, "filename required after -e");
                                     halt(1);
                                 end;
-                                
+
                                 index := index + 1;
                                 argv(index, treeDumpFileName);
                                 debugTree := true;
                             end else if (ARG_OPT(3,  'x') and (ARG_OPT(4, 'c')) and (ARG_OPT(5, 'p')) and (ARG_OPT(6, 't')) and (ARG_OPT(7, ' '))) then begin
                                 excpt := true;
                             end else goto default;
-
+                        end;
                         CASE_ARG('d')
                         begin
                             if (IS_OPT("-dwopcode")) then begin
@@ -493,14 +502,14 @@ begin
                             if (ARG_OPT(3, ' ')) then begin
                                 writeln(err, "numeric argument required for -g");
                             end else if ((arg[3] >= '0') and (arg[3] < '5')) then begin
-                                sp51C := u8(arg[3]) - ord('0');
+                                debugLevel := DebugLevels(ord(arg[3]) - ord('0');
                             end else goto default;
 
-                        CASE_ARG('O') 
+                        CASE_ARG('O')
                             if (ARG_OPT(3, ' ')) then begin
                                 writeln(err, "numeric argument required for -O");
                             end else if ((arg[3] >= '0') and (arg[3] < '5')) then begin
-                                sp518 := opt_levels(ord(arg[3]) - ord('0'));
+                                optLevel := OptLevels(ord(arg[3]) - ord('0'));
                             end else goto default;
 
                         CASE_ARG('G')
@@ -509,7 +518,7 @@ begin
                                     writeln(err, "numeric argument required for -G");
                                     halt(1);
                                 end;
-                                
+
                                 index := index + 1;
                                 argv(index, arg);
                                 sdata_max := str_atoi(arg);
@@ -519,28 +528,28 @@ begin
                                     writeln(err, "-pic2 implies -G 0. -G option ignored");
                                     sdata_max := 0;
                                 end;
-                                
+
                             end else goto default;
 
                         CASE_ARG('r')
                             if ((ARG_OPT(3, 'e')) and (arg[4] = 'g')) then begin
                                 index := index + 1;
-                                var_s0 := arg[5];
+                                reg := arg[5];
                                 argv(index, arg);
-                                func_0044B384(var_s0, str_atoi(arg));
+                                process_reg(reg, str_atoi(arg));
                             end else goto default;
 
                         CASE_ARG('f')
                             if (ARG_OPT(3, 'r') and ARG_OPT(4, 'e') and ARG_OPT(5, 'g')) then begin
                                 index := index + 1;
-                                var_s0 := arg[6];
+                                reg := arg[6];
                                 argv(index, arg);
-                                func_0044B640(var_s0, str_atoi(arg));
+                                process_fp_reg(reg, str_atoi(arg));
                             end else begin
                                 if (streq(arg, "-fp32regs")) then begin
                                     fp32regs := true;
                                 end else goto default;
-                            end;   
+                            end;
 
                         CASE_ARG('L')
                             if (ARG_OPT(3, ' ')) then begin
@@ -615,7 +624,7 @@ begin
                             end;
 
                         CASE_ARG('w')
-                            case arg[3] of 
+                            case arg[3] of
                                 CASE_ARG('1')
                                 begin
                                     warnLevel := ord(Info);
@@ -645,13 +654,13 @@ begin
                                     writeln(err, "numeric argument required for -checkstack");
                                     halt(1);
                                 end;
-                                
+
                                 index := index + 1;
                                 argv(index, arg);
                                 max_stack := str_atoi(arg);
-                                
+
                             end else goto default;
-                        
+
                         CASE_ARG('6')
                             if (ARG_OPT(3, '4') and ARG_OPT(4, 'd') and ARG_OPT(5, 'a') and ARG_OPT(6, 't') and ARG_OPT(7, 'a') and ARG_OPT(8, ' ')) then begin
                                 isa := ISA_MIPS3;
@@ -662,77 +671,77 @@ begin
                             end else goto default;
 
                         CASE_ARG('-')
-                            if ((xpg_env = true) and ARG_OPT(3, '-')) then begin
+                            if ((useXpgEnv = true) and ARG_OPT(3, '-')) then begin
                                 argv(index, xpgEnvVar);
 
-                                SKIP_END_SPACES(var_s1, xpgEnvVar);
+                                SKIP_END_SPACES(inputFileNameLen, xpgEnvVar);
 
-                                if (var_s1 <> 0) then begin
-                                    xpgEnvVar[var_s1 + 1] := chr(0);
+                                if (inputFileNameLen <> 0) then begin
+                                    xpgEnvVar[inputFileNameLen + 1] := chr(0);
                                 end else begin
                                     writeln(err, arg:0, " not understood");
                                 end;
 
-                                for var_a0 := 3 to var_s1 + 1 do begin
-                                    sp15C0[var_a0 - 2] := xpgEnvVar[var_a0];
+                                for i := 3 to inputFileNameLen + 1 do begin
+                                    inputFileName[i - 2] := xpgEnvVar[i];
                                 end;
 
                             end;
-                        
-                            otherwise: 
+
+                            otherwise:
                             default:
                                 writeln(err, arg:0, " not understood");
-                    end;                    
+                    end;
                 end else begin
-                    argv(index, sp15C0);
-                    
-                    SKIP_END_SPACES(var_s1, sp15C0);        
+                    argv(index, inputFileName);
+
+                    SKIP_END_SPACES(inputFileNameLen, inputFileName);
                 end;
-            
-                index := index + 1;                
+
+                index := index + 1;
              until (index >= argc);
         end;
 
-        if (sp15C0[1] = chr(0)) then begin
+        if (inputFileName[1] = chr(0)) then begin
             writeln(err, "Must specify .F file");
             halt(1);
         end;
-        
+
         if ((n_parm_regs + n_saved_regs + n_unsaved_regs) >= 19) then begin
             report_error(Internal, 779, "ugen.p", "too many registers");
             halt(1);
         end;
-        
+
         if ((n_fp_parm_regs + n_saved_fp_regs + n_unsaved_fp_regs) >= 11) then begin
             report_error(Internal, 784, "ugen.p", "too many fp registers");
             halt(1);
         end;
-        
+
         if (fp32regs and ((isa = ISA_MIPS1) or (isa = ISA_MIPS2))) then begin
             report_error(Internal, 789, "ugen.p", "fp32regs is only legal for mips3 and future architectures");
             halt(1);
         end;
 
         if (ascii_out) then begin
-            SKIP_END_SPACES(var_v0_3, spDC0);
-            spDC0[var_v0_3 + 1] := chr(0);
-        
-            rewrite(sp534, spDC0);
+            SKIP_END_SPACES(nameLen, asmOutputFilePath);
+            asmOutputFilePath[nameLen + 1] := chr(0);
+
+            rewrite(asmOutputFile, asmOutputFilePath);
 
             if (stFileName[1] = chr(0)) then begin
-                for index := 1 to var_s1 - 1 do begin    
-                    stFileName[index] := sp15C0[index];
+                for index := 1 to inputFileNameLen - 1 do begin
+                    stFileName[index] := inputFileName[index];
                 end;
-                var_v0_3 := var_s1;
-                stFileName[var_v0_3] := 'T';
+                nameLen := inputFileNameLen;
+                stFileName[nameLen] := 'T';
             end else begin
-                var_v0_3 := sizeof(stFileName) - 1;
-                while ((var_v0_3 <> 0) and (stFileName[var_v0_3] = ' ')) do begin
-                    var_v0_3 := var_v0_3 - 1;
+                nameLen := sizeof(stFileName) - 1;
+                while ((nameLen <> 0) and (stFileName[nameLen] = ' ')) do begin
+                    nameLen := nameLen - 1;
                 end;
             end;
 
-            stFileName[var_v0_3 + 1] := chr(0);
+            stFileName[nameLen + 1] := chr(0);
             if (st_readbinary(stFileName, 'r') < 0) then begin
                 writeln(err, "Cannot read symbol table file");
                 halt(1);
@@ -742,30 +751,30 @@ begin
         initialize_tree();
         init_ibuffer();
         uini();
-        initur(sp15C0);
+        initur(inputFileName);
 
         if (outputFileName[1] = chr(0)) then begin
-            outputFileName := sp15C0;
-            outputFileName[var_s1] := 'G'; {binasm extension}
-            var_v0_3 := var_s1;
-        end else begin 
-           SKIP_END_SPACES(var_v0_3, outputFileName);
+            outputFileName := inputFileName;
+            outputFileName[inputFileNameLen] := 'G'; {binasm extension}
+            nameLen := inputFileNameLen;
+        end else begin
+           SKIP_END_SPACES(nameLen, outputFileName);
         end;
 
-        outputFileName[var_v0_3 + 1] := chr(0);
+        outputFileName[nameLen + 1] := chr(0);
 
         if (ugenTempFileName[1] = chr(0)) then begin
             create_temp_file();
-        end else begin 
-            SKIP_END_SPACES(var_v0_4, ugenTempFileName);
-            ugenTempFileName[var_v0_4 + 1] := chr(0);
+        end else begin
+            SKIP_END_SPACES(ugenTempFileNameLen, ugenTempFileName);
+            ugenTempFileName[ugenTempFileNameLen + 1] := chr(0);
         end;
 
         if (treeDumpFileName[1] <> chr(0)) then begin
             rewrite(treeDumpFile, treeDumpFileName);
         end;
 
-        set_opts(sp518, sp51C);
+        set_opts(optLevel, debugLevel);
 
         if (verbose) then begin
             write(err, "ugen:");
@@ -782,7 +791,7 @@ begin
 
             if (pTree = nil) then begin
                 break;
-            end; 
+            end;
 
             if (debugTree) then begin
                 dump_tree(pTree, "Build");
@@ -794,7 +803,7 @@ begin
                 dump_tree(pTree, "Translate");
             end;
 
-            if (opt_labels <> 0) then begin
+            if (opt_labels) then begin
                 if (treeDumpFileName[1] <> chr(0)) then begin
                     labelopt(pTree, treeDumpFile, debugTree, debugLabelOptPhase);
                 end else begin
@@ -802,11 +811,13 @@ begin
                 end;
             end;
 
-            func_0044B2EC(pTree);
+            assign_dense_labels(pTree);
 
-            if (sp9C0[1] <> chr(0)) then begin
-                inituwrite(sp9C0);
+            if (treeUcodeFileName[1] <> chr(0)) then begin
+                { Save the ucode represented by the tree }
+                inituwrite(treeUcodeFileName);
                 u_tree(pTree);
+                {@bug: The output file will be truncated, since the call of uputclose is missing }
             end;
 
             init_eval();
@@ -824,14 +835,14 @@ begin
         output_inst_bin(ibuffer^[1], pred(i_ptr), ibuffer^[ibuffer_size], ibuffer_size - d_ptr);
         close_bin_file();
         cat_files(outputFileName, ugenTempFileName);
-        
+
         if not (useTempFile) then begin
             unlink_temp_file();
         end;
 
         if (ascii_out) then begin
-            outputFileName[var_v0_3 + 1] := ' ';
-            output_inst_ascii(outputFileName, sp534);
+            outputFileName[nameLen + 1] := ' ';
+            output_inst_ascii(outputFileName, asmOutputFile);
         end;
 
         if (verbose) then begin
@@ -841,7 +852,6 @@ begin
         if (has_errors(warnLevel)) then begin
             halt(1);
         end;
-        
     end;
 
     return 0;

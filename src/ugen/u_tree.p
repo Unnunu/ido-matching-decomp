@@ -5,7 +5,7 @@ procedure u_tree(p_Tree: ^Tree);
 var
     u: Bcrec;
 begin
-    repeat begin 
+    repeat begin
         {Do some safety checks}
         if (p_Tree^.u.Opc <> Unop) then begin
             if (p_Tree^.op1 <> nil) then begin
