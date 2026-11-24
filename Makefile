@@ -17,6 +17,11 @@ IDO_TC_5.3 := cc cfe as0 ugen
 # Source directories that only belong to one version
 SRC_EXCLUDE_7.1 :=
 SRC_EXCLUDE_5.3 := src/as1
+# Individual source files that only belong to one version.
+# asm-processor does not evaluate #if, so version-gated GLOBAL_ASM files
+# must be excluded from the build instead.
+SRC_EXCLUDE_FILES_7.1 :=
+SRC_EXCLUDE_FILES_5.3 := src/cfe/codegen.c
 
 ifeq ($(VERSION),7.1)
 	IDO_VERSION := IDO_71
@@ -48,6 +53,8 @@ ROOTDIR := $(CURDIR)
 
 UV ?= uv
 PYTHON := $(UV) run python
+OBJDIFF_CLI ?= objdiff-cli
+DIFF_FLAGS ?=
 
 RECOMP_VERSION := v1.2
 RECOMP         := $(ROOTDIR)/tools/ido_recomp
@@ -122,8 +129,8 @@ ALL_SRC_DIRS := $(shell find src -type d)
 SRC_DIRS := $(filter-out $(SRC_EXCLUDE_$(VERSION)),$(ALL_SRC_DIRS))
 ASM_DIRS := $(shell find asm/$(VERSION) -type d -not -path "asm/$(VERSION)/functions*" 2>/dev/null)
 
-C_FILES  := $(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.c))
-P_FILES  := $(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.p)) # Pascal files
+C_FILES  := $(filter-out $(SRC_EXCLUDE_FILES_$(VERSION)),$(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.c)))
+P_FILES  := $(filter-out $(SRC_EXCLUDE_FILES_$(VERSION)),$(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.p))) # Pascal files
 
 S_FILES  := $(foreach dir,$(ASM_DIRS),$(wildcard $(dir)/*.s))
 COMBINED_S_FILES := $(sort $(foreach file, $(S_FILES:.s=), $(basename $(file))))
@@ -155,7 +162,7 @@ build/src/7.1/libu/%.o: OPTFLAGS := -O2
 
 # Targets
 
-.PHONY: all build check both clean distclean setup uv-sync disasm disasm-all
+.PHONY: all build check both clean distclean setup uv-sync disasm disasm-all objdiff diff
 .DEFAULT_GOAL:= all
 
 all: build
@@ -168,6 +175,13 @@ check: build
 both:
 	$(MAKE) VERSION=5.3 build
 	$(MAKE) VERSION=7.1 build
+
+objdiff: build
+	$(PYTHON) tools/gen_objdiff.py --version all
+
+diff: objdiff
+	@if [ -z "$(UNIT)" ]; then echo "usage: make diff UNIT=<version>/<program>/<file> [SYM=<symbol>]"; exit 2; fi
+	$(OBJDIFF_CLI) diff -p . -u $(UNIT) $(SYM) $(DIFF_FLAGS)
 
 clean:
 	$(RM) -r $(BUILD)

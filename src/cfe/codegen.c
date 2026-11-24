@@ -285,6 +285,7 @@ static void func_004628B0(void) {
     Ucp = (struct Bcrec*)Uout_buff;
 }
 
+#ifdef IDO_71
 #pragma GLOBAL_ASM("asm/7.1/functions/cfe/codegen/uw_init.s")
 
 #pragma GLOBAL_ASM("asm/7.1/functions/cfe/codegen/func_00463488.s")
@@ -328,3 +329,4 @@ static void func_004628B0(void) {
 #pragma GLOBAL_ASM("asm/7.1/functions/cfe/codegen/func_0046B13C.s")
 
 #pragma GLOBAL_ASM("asm/7.1/functions/cfe/codegen/Set_Small_Data_Upper_Limit.s")
+#endif

@@ -55,6 +55,7 @@ dkms.conf
 
 build/
 asm/
+objdiff.json
 tools/ido_recomp/
 tools/yacc/yacc
 src/cfe/c.c
