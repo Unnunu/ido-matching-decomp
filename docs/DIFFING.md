@@ -133,6 +133,29 @@ relocations. `tools/gen_objdiff.py` runs it for regular units, and
 shows the same `RO_STR_...` names as the target. Library units are left
 unchanged because their base object may be shared by several targets.
 
+BSS labels get the same treatment. spimdisasm names target BSS ranges `B_...`
+but emits them as size-0 local `STT_NOTYPE` labels, while the compiler often
+leaves the base with only a `.bss` section symbol plus relocation addends.
+objdiff resolves section relocations to the nearest named symbol, so a target
+relocation becomes `B_...` and the corresponding base relocation stays
+`[.bss]+offset`; `reloc_eq` then treats the identical reference as different.
+`tools/symbolize_base.py` therefore copies missing target `B_...` labels into
+the base, but only when the base has no symbol at the destination offset.
+Existing base names are preserved, and the mirrored labels keep size 0 and
+`STT_NOTYPE`.
+
+The destination is not always the target offset. A target split can cover only
+part of the base `.bss`, or the compiler can order BSS variables differently;
+for example `7.1/cfe/c` target `B_10020F10` is at offset `0x10`, while the base
+variable is at `0x3e90`. The tool infers the per-section shift by pairing
+`R_MIPS_LO16` relocations at the same code address on both sides and comparing
+their effective BSS offsets. Only unambiguous shifts are used. Without this,
+the mirrored label lands at the wrong base offset and objdiff still compares
+`B_10020F10` against `[.bss]+0x3e90`. With it, relocations match by symbol name
+even when the two sections use different offsets. This makes correct BSS
+references match 100% while a reference to a different BSS offset still
+differs. BSS is not counted in `PROGRESS.md`.
+
 The fake section symbol that objdiff adds for "all data in this section" uses
 `STT_OBJECT` symbols to infer its size. The `nonmatching` macro therefore emits
 `.NON_MATCHING` markers as `STT_NOTYPE`; otherwise a size-1 marker near the end
