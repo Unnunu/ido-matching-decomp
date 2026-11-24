@@ -162,15 +162,41 @@ build/src/7.1/libu/%.o: OPTFLAGS := -O2
 
 # Targets
 
-.PHONY: all build check both clean distclean setup uv-sync disasm disasm-all objdiff diff
+.PHONY: all build check check-legacy both clean distclean setup uv-sync disasm disasm-all objdiff diff match progress baseline
 .DEFAULT_GOAL:= all
 
 all: build
+	@if [ -f $(BUILD)/report.json ] && [ -f objdiff.json ] && command -v "$(OBJDIFF_CLI)" >/dev/null 2>&1; then \
+		$(OBJDIFF_CLI) report generate -p . -o $(BUILD)/report.json >/dev/null 2>&1 && \
+		$(PYTHON) tools/progress.py --write --incremental --no-markdown --init-baseline --quiet; \
+	fi
 
 build: $(ELFS) $(O_FILES)
 
-check: build
+# Legacy exact object comparison.  Stage 4 removes the legacy diff tools.
+check-legacy: build
 	$(PYTHON) tools/diff_objfiles.py $(VERSION)
+
+# Full progress pass.  Fails when PROGRESS.md is stale or when matched counts
+# dropped below build/baseline.json.
+check: objdiff
+	$(OBJDIFF_CLI) report generate -p . -o $(BUILD)/report.json
+	$(PYTHON) tools/progress.py --check --full
+
+# Incremental progress update using the mtime cache for build/asm-marked.
+match: objdiff
+	$(OBJDIFF_CLI) report generate -p . -o $(BUILD)/report.json
+	$(PYTHON) tools/progress.py --write --incremental --init-baseline
+
+# Full progress pass that also prints the table.
+progress: objdiff
+	$(OBJDIFF_CLI) report generate -p . -o $(BUILD)/report.json
+	$(PYTHON) tools/progress.py --write --full --print --init-baseline
+
+# Explicitly refresh the regression baseline.
+baseline: objdiff
+	$(OBJDIFF_CLI) report generate -p . -o $(BUILD)/report.json
+	$(PYTHON) tools/progress.py --write --full --write-baseline
 
 both:
 	$(MAKE) VERSION=5.3 build

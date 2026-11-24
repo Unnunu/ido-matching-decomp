@@ -73,3 +73,28 @@ make diff UNIT=... SYM=... OBJDIFF_CLI=/path/to/objdiff-cli-3.8.3
 ```bash
 objdiff-cli report generate -p . -o build/report.json
 ```
+
+## Progress
+
+```bash
+make match      # incremental update; writes PROGRESS.md and build/progress.json
+make progress   # full pass, prints the table
+make check      # fail on stale PROGRESS.md or a regression vs build/baseline.json
+make baseline   # explicitly refresh the regression baseline
+```
+
+`tools/progress.py` derives matched functions from the report. Target objects
+without a base object (source files that have not been started yet) are still
+counted in the denominator as unmatched. Duplicate target objects are
+deduplicated by their function/data signature. The tool excludes `__start`,
+`_mcount`, crt/runtime symbols and `*.NON_MATCHING` aliases, and honours
+`matched`/`ignored` entries in
+`symbols/<version>/<program>.match_overrides.txt`.
+
+The table also reports `.data` and `.rodata` byte match percentages. They use
+objdiff section match percentages; target-only units contribute their full
+section size to the denominator. `.bss` is intentionally not counted yet.
+
+The generated NON_MATCHING view lives in `build/asm-marked/<version>/<program>/`.
+It is produced from `asm/` without rewriting it. `make match` reuses an mtime
+cache stored in `build/progress.json`, so unchanged units are not rewritten.
