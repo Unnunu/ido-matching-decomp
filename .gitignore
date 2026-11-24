@@ -62,5 +62,6 @@ src/cfe/c.c
 ctx.c
 ctx.c.m2c
 __pycache__/
+.venv/
 
 context/

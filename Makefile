@@ -11,17 +11,22 @@ VERSION ?= 7.1
 WERROR ?= 0
 CC_CHECK_COMP ?= gcc
 
+IDO_TC_7.1 := cc cfe ugen as1 umerge as0 uopt
+IDO_TC_5.3 := cc cfe as0 ugen
+
+# Source directories that only belong to one version
+SRC_EXCLUDE_7.1 :=
+SRC_EXCLUDE_5.3 := src/as1
+
 ifeq ($(VERSION),7.1)
 	IDO_VERSION := IDO_71
-#	IDO_TC      := cc acpp as0 as1 cfe copt ugen ujoin uld umerge uopt upas usplit
-	IDO_TC      := cc cfe ugen as1 umerge as0 uopt
 else ifeq ($(VERSION),5.3)
 	IDO_VERSION := IDO_53
-#	IDO_TC      := cc acpp as0 as1 cfe copt ld ugen ujoin uld umerge uopt usplit
-	IDO_TC      := cc cfe as0 ugen
 else
 $(error Unknown or unsupported IDO version - $(VERSION))
 endif
+
+IDO_TC := $(IDO_TC_$(VERSION))
 
 
 #### Tools ####
@@ -40,6 +45,9 @@ else
 endif
 
 ROOTDIR := $(CURDIR)
+
+UV ?= uv
+PYTHON := $(UV) run python
 
 RECOMP_VERSION := v1.2
 RECOMP         := $(ROOTDIR)/tools/ido_recomp
@@ -63,9 +71,9 @@ OBJCOPY    := $(MIPS_BINUTILS_PREFIX)objcopy
 OBJDUMP    := $(MIPS_BINUTILS_PREFIX)objdump
 MIPS_GCC   := $(MIPS_BINUTILS_PREFIX)gcc
 
-DISASSEMBLER  := python3 -m spimdisasm.elfObjDisasm
+DISASSEMBLER  := $(PYTHON) -m spimdisasm.elfObjDisasm
 DISASSEMBLER_FLAGS += --no-emit-cpload --Mreg-names o32 --no-use-fpccsr --rodata-string-guesser 4 --pascal-rodata-string-guesser 4 --print-new-file-boundaries --asm-jtbl-label jlabel --asm-data-label dlabel
-ASM_PROCESSOR := python3 $(ROOTDIR)/tools/asm-processor/build.py
+ASM_PROCESSOR := $(PYTHON) $(ROOTDIR)/tools/asm-processor/build.py
 YACC := $(YACCDIR)/yacc
 YFLAGS := -p $(YACCDIR)/yaccpar -t
 
@@ -110,8 +118,9 @@ IRIX_USR_DIR ?= $(IRIX_BASE)/$(VERSION)/usr
 DISASM_TARGETS := $(foreach binary,$(IDO_TC),$(ASM)/$(VERSION)/$(binary)/.disasm)
 
 
-SRC_DIRS := $(shell find src -type d)
-ASM_DIRS := $(shell find asm/$(VERSION) -type d -not -path "asm/$(VERSION)/functions*")
+ALL_SRC_DIRS := $(shell find src -type d)
+SRC_DIRS := $(filter-out $(SRC_EXCLUDE_$(VERSION)),$(ALL_SRC_DIRS))
+ASM_DIRS := $(shell find asm/$(VERSION) -type d -not -path "asm/$(VERSION)/functions*" 2>/dev/null)
 
 C_FILES  := $(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.c))
 P_FILES  := $(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.p)) # Pascal files
@@ -146,11 +155,19 @@ build/src/7.1/libu/%.o: OPTFLAGS := -O2
 
 # Targets
 
-.PHONY: all clean distclean setup disasm
+.PHONY: all build check both clean distclean setup uv-sync disasm disasm-all
 .DEFAULT_GOAL:= all
 
-all: $(ELFS) $(O_FILES)
-	./tools/diff_objfiles.py $(VERSION)
+all: build
+
+build: $(ELFS) $(O_FILES)
+
+check: build
+	$(PYTHON) tools/diff_objfiles.py $(VERSION)
+
+both:
+	$(MAKE) VERSION=5.3 build
+	$(MAKE) VERSION=7.1 build
 
 clean:
 	$(RM) -r $(BUILD)
@@ -159,12 +176,19 @@ clean:
 distclean: clean
 	$(RM) -r $(RECOMP) $(ASM) $(YACC)
 
-setup: $(RECOMP) $(YACC)
+uv-sync:
+	$(UV) sync
+
+setup: uv-sync $(RECOMP) $(YACC)
 
 yacc: $(YACC)
 
 disasm: $(DISASM_TARGETS)
 	find asm -type f -name "*.s" | grep -v "/functions/" | xargs sed -i -e "s/glabel func_/llabel func_/; s/dlabel RO_/llabel RO_/; s/dlabel B_/llabel B_/; s/dlabel D_/llabel D_/; s/dlabel jtbl_/llabel jtbl_/;"
+
+disasm-all:
+	$(MAKE) VERSION=5.3 disasm
+	$(MAKE) VERSION=7.1 disasm
 
 
 $(RECOMP):
