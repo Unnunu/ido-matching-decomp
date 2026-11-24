@@ -24,6 +24,7 @@ from library import (
     library_category_name,
     library_source_path,
 )
+from symbolize_base import symbolize_base
 
 ROOT = Path(__file__).resolve().parent.parent
 BUILD = ROOT / "build"
@@ -33,6 +34,14 @@ SYMBOLS = ROOT / "symbols"
 VERSIONS = ("5.3", "7.1")
 SOURCE_EXTS = (".c", ".p")
 MIN_VERSION = "3.8.3"
+
+# objdiff GUI rebuilds the base object on save and via the Build button. The
+# wrapper derives VERSION from the object path so one config covers both
+# versions. Targets are produced by disassembly, not by the C/Pascal build.
+BUILD_BASE = True
+BUILD_TARGET = False
+CUSTOM_MAKE = "uv"
+CUSTOM_ARGS = ["run", "python", "tools/objdiff_make.py"]
 
 # Explicit target -> source aliases where the split name differs from the
 # source basename.
@@ -295,6 +304,13 @@ def generate(versions: list[str], include_missing_base: bool) -> tuple[dict, int
                         "metadata": metadata,
                     }
                     if base is not None:
+                        try:
+                            symbolize_base(target, base)
+                        except Exception as exc:
+                            print(
+                                f"warning: could not symbolize {base}: {exc}",
+                                file=sys.stderr,
+                            )
                         unit["base_path"] = base.relative_to(ROOT).as_posix()
                         unit["symbol_mappings"] = symbol_mappings(
                             target, base, version, program
@@ -346,8 +362,10 @@ def generate(versions: list[str], include_missing_base: bool) -> tuple[dict, int
 
     return {
         "min_version": MIN_VERSION,
-        "build_base": False,
-        "build_target": False,
+        "build_base": BUILD_BASE,
+        "build_target": BUILD_TARGET,
+        "custom_make": CUSTOM_MAKE,
+        "custom_args": CUSTOM_ARGS,
         "watch_patterns": ["src/**", "symbols/**", "include/**"],
         "progress_categories": [categories[key] for key in sorted(categories)],
         "units": units,

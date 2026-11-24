@@ -242,8 +242,8 @@ $(YACC):
 $(BUILD)/$(ASM)/$(VERSION)/%.elf: $(O_FILES)
 	$(LD) $(BUILD)/$(ASM)/$(VERSION)/$*/*.o $(LDFLAGS) --no-check-sections --accept-unknown-input-arch --allow-shlib-undefined -Map $(BUILD)/$(ASM)/$(VERSION)/$*.map -o $@ || (rm -f $@ && exit 1)
 
-$(BUILD)/$(ASM)/%.o: $(ASM)/%.*.s
-	$(AS) $(ASFLAGS) $^ -o $@
+$(BUILD)/$(ASM)/%.o: $(ASM)/%.*.s include/macro.inc
+	$(AS) $(ASFLAGS) $(filter %.s,$^) -o $@
 
 $(BUILD)/src/$(VERSION)/%.o: src/%.c
 	$(CC_CHECK) $(CC_CHECK_FLAGS) $(IINC) $(CHECK_WARNINGS) $(MIPS_BUILTIN_DEFS) -o $@ $<

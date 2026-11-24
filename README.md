@@ -134,21 +134,20 @@ use `make match`, `make progress` or `make baseline` for that.
 
 ## Diffing
 
-Build the objects and generate the objdiff configuration first:
+`make diff` rebuilds stale objects, regenerates the objdiff configuration, and
+runs the diff:
+
+```bash
+make diff UNIT=7.1/ugen/build SYM=build_tree
+```
+
+`objdiff-cli diff` itself does not build, so build and generate the config first
+when calling it directly:
 
 ```bash
 make both
 make objdiff
-```
-
-`make objdiff` writes `objdiff.json` (ignored by git) for both versions. It
-does not build missing objects itself.
-
-Diff a unit with the CLI:
-
-```bash
 objdiff-cli diff -p . -u 7.1/ugen/build build_tree
-make diff UNIT=7.1/ugen/build SYM=build_tree
 ```
 
 For non-interactive output:
@@ -157,10 +156,16 @@ For non-interactive output:
 make diff UNIT=7.1/ugen/build SYM=build_tree DIFF_FLAGS='-o /tmp/diff.json'
 ```
 
-To use the GUI, open the repository root in objdiff. Unit names follow
-`<version>/<program>/<file>`, for example `7.1/ugen/build`. Library units use
-`<version>/<library>/<module>/<program>/<target>`, for example
+To use the GUI, open the repository root in objdiff. The **Build** button and
+the on-save watcher rebuild the selected unit's base object automatically
+(`build_base` and `custom_make` are generated into `objdiff.json`). Unit names
+follow `<version>/<program>/<file>`, for example `7.1/ugen/build`. Library
+units use `<version>/<library>/<module>/<program>/<target>`, for example
 `7.1/libu/uini/ugen/ugen_04F430`.
+
+Base objects are also given the target's local symbol names for anonymous
+data and functions (`RO_STR_...`, `D_...`, `func_...`) so objdiff can compare
+individual strings and data items instead of one raw section blob.
 
 See [docs/DIFFING.md](docs/DIFFING.md) for symbol mappings, library units and
 all available options.
@@ -240,8 +245,9 @@ in [PROGRESS.md](PROGRESS.md).
 - `include/` - project headers, including IRIX/IDO headers under `include/indy/`.
 - `ido/` - original IDO binaries used for disassembly.
 - `lib/indy/dev/usr/lib/` - tracked crt objects from the IDO release.
-- `tools/` - build helpers: `gen_objdiff.py`, `progress.py`, `library.py`,
-  `asm-processor/` and the bundled `yacc/`.
+- `tools/` - build helpers: `gen_objdiff.py`, `objdiff_make.py`,
+  `symbolize_base.py`, `progress.py`, `library.py`, `asm-processor/` and the
+  bundled `yacc/`.
 - `docs/DIFFING.md` - detailed objdiff and progress documentation.
 - `PROGRESS.md` - generated, tracked matching status.
 - `Makefile` - build, disassembly, diff and progress entry points.

@@ -18,6 +18,7 @@ import hashlib
 import json
 import re
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 from elftools.elf.elffile import ELFFile
@@ -285,7 +286,7 @@ def classify_function(
     }
 
 
-def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
+def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict, list[str]]:
     units: list[dict] = []
     library_records: list[dict] = []
     matched_by_unit: dict[tuple[str, str, str], set[str]] = {}
@@ -301,6 +302,14 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
         )
     library_report_units: dict[tuple[str, str, str, str, str], dict] = {}
     library_defined_cache: dict[tuple[str, str, str], set[str]] = {}
+    text_cache: dict[Path, bytes] = {}
+    text_ranges_cache: dict[Path, list[tuple[int, int]]] = {}
+    known_rels: dict[str, dict[str, set[str]]] = defaultdict(
+        lambda: defaultdict(set)
+    )
+    known_functions: dict[str, dict[str, set[str]]] = defaultdict(
+        lambda: defaultdict(set)
+    )
 
     def overrides_for(version: str, program: str) -> dict[str, str]:
         key = (version, program)
@@ -468,20 +477,109 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
             library_defined_cache[key] = defined
         return name in defined
 
+    def read_text_bytes(path: Path) -> bytes:
+        data = text_cache.get(path)
+        if data is None:
+            with path.open("rb") as f:
+                elf = ELFFile(f)
+                section = elf.get_section_by_name(".text")
+                data = section.data() if section is not None else b""
+            text_cache[path] = data
+        return data
+
+    def base_text_ranges(path: Path) -> list[tuple[int, int]]:
+        ranges = text_ranges_cache.get(path)
+        if ranges is None:
+            ranges = []
+            with path.open("rb") as f:
+                elf = ELFFile(f)
+                symtab = elf.get_section_by_name(".symtab")
+                if symtab is not None:
+                    for symbol in symtab.iter_symbols():
+                        name = symbol.name
+                        if not name or name.endswith(".NON_MATCHING"):
+                            continue
+                        if symbol["st_info"]["type"] not in (
+                            "STT_FUNC",
+                            "STT_NOTYPE",
+                        ):
+                            continue
+                        section_index = symbol["st_shndx"]
+                        if (
+                            not isinstance(section_index, int)
+                            or section_index <= 0
+                            or section_index >= elf.num_sections()
+                        ):
+                            continue
+                        size = symbol["st_size"]
+                        if size <= 0:
+                            continue
+                        section = elf.get_section(section_index)
+                        if section is None or section.name != ".text":
+                            continue
+                        start = symbol["st_value"]
+                        ranges.append((start, start + size))
+            text_ranges_cache[path] = ranges
+        return ranges
+
+    def library_has_anonymous_code(
+        version: str,
+        category: tuple[str, str],
+        target_path: Path | None,
+        address: str | None,
+        size: int,
+    ) -> bool:
+        if target_path is None or address is None or size <= 0:
+            return False
+        library, module = category
+        base_path = library_base_path(version, library, module)
+        if base_path is None:
+            return False
+        try:
+            start = int(address)
+        except (TypeError, ValueError):
+            return False
+        end = start + size
+        base_text = read_text_bytes(base_path)
+        target_text = read_text_bytes(target_path)
+        if start < 0 or end > len(base_text) or end > len(target_text):
+            return False
+        if base_text[start:end] != target_text[start:end]:
+            return False
+        return not any(
+            low <= start and end <= high
+            for low, high in base_text_ranges(base_path)
+        )
+
     def library_fuzzy(
-        version: str, program: str, rel: str, category: tuple[str, str], name: str
+        version: str,
+        program: str,
+        rel: str,
+        category: tuple[str, str],
+        function: dict,
+        target_path: Path | None,
     ) -> float | None:
         library, module = category
-        if not library_defines(version, library, module, name):
+        name = function.get("name", "")
+        if not (
+            library_defines(version, library, module, name)
+            or library_has_anonymous_code(
+                version,
+                category,
+                target_path,
+                function.get("address"),
+                int(function.get("size", 0)),
+            )
+        ):
             return None
         report_unit = library_report_units.get(
             (version, program, rel, library, module)
         )
         if report_unit is None:
             return None
-        for function in report_unit.get("functions", []):
-            if function.get("name") == name:
-                fuzzy = function.get("fuzzy_match_percent")
+        for report_function in report_unit.get("functions", []):
+            if report_function.get("name") == name:
+                fuzzy = report_function.get("fuzzy_match_percent")
                 return float(fuzzy) if fuzzy is not None else None
         return None
 
@@ -508,7 +606,8 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
             "reason": reason,
         }
 
-    for unit in report.get("units", []):
+    report_units = report.get("units", [])
+    for unit in report_units:
         name = unit.get("name", "")
         metadata = unit.get("metadata", {})
         version = name.split("/", 1)[0]
@@ -519,9 +618,7 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
             library_report_units[
                 (version, target_program, target_rel, library, module)
             ] = unit
-            continue
-
-        if metadata.get("library"):
+        elif metadata.get("library"):
             target_program = metadata.get("target_program")
             target_rel = metadata.get("target_rel")
             library = metadata.get("library_name")
@@ -530,6 +627,16 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
                 library_report_units[
                     (version, target_program, target_rel, library, module)
                 ] = unit
+
+    for unit in report_units:
+        name = unit.get("name", "")
+        metadata = unit.get("metadata", {})
+        version = name.split("/", 1)[0]
+
+        library_parts = name.split("/", 4)
+        if (
+            len(library_parts) == 5 and library_parts[1] in library_names
+        ) or metadata.get("library"):
             continue
 
         parts = name.split("/", 2)
@@ -544,9 +651,13 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
 
         target_path = target_path_for_unit(version, program, rel, asm_build_root)
         report_target_paths.add(target_path)
+        known_rels[version][program].add(rel)
         target_sections: dict[str, dict] = {}
         if target_path.is_file():
             target_functions = read_target_functions(target_path)
+            known_functions[version][program].update(
+                function["name"] for function in target_functions
+            )
             target_sections = read_target_sections(target_path)
             if target_functions:
                 seen_for(version, program).add(
@@ -590,7 +701,6 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
                 excluded_functions += 1
                 continue
 
-            fuzzy = function.get("fuzzy_match_percent")
             category = catalog.category_for(program, rel, function_name)
             if category is not None:
                 library_functions.setdefault(category, []).append(
@@ -598,7 +708,14 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
                         function_name,
                         int(function.get("size", "0")),
                         function.get("address"),
-                        fuzzy,
+                        library_fuzzy(
+                            version,
+                            program,
+                            rel,
+                            category,
+                            function,
+                            target_path,
+                        ),
                         action,
                     )
                 )
@@ -608,7 +725,7 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
                         function_name,
                         int(function.get("size", "0")),
                         function.get("address"),
-                        fuzzy,
+                        function.get("fuzzy_match_percent"),
                         has_source,
                         action,
                     )
@@ -673,8 +790,14 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
                 if target_path in report_target_paths:
                     continue
 
+                rel = target_path.relative_to(program_dir).with_suffix("").as_posix()
+                known_rels[version][program].add(rel)
+
                 target_functions = read_target_functions(target_path)
                 target_sections = read_target_sections(target_path)
+                known_functions[version][program].update(
+                    function["name"] for function in target_functions
+                )
                 if not target_functions and not target_sections:
                     continue
 
@@ -688,7 +811,6 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
                     continue
                 seen.add(signature)
 
-                rel = target_path.relative_to(program_dir).with_suffix("").as_posix()
                 overrides = overrides_for(version, program)
                 unit_library = catalog.unit_category(program, rel)
                 program_functions = []
@@ -709,7 +831,12 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
                     category = catalog.category_for(program, rel, function_name)
                     if category is not None:
                         fuzzy = library_fuzzy(
-                            version, program, rel, category, function_name
+                            version,
+                            program,
+                            rel,
+                            category,
+                            function,
+                            target_path,
                         )
                         library_functions.setdefault(category, []).append(
                             classify_library_function(
@@ -814,6 +941,27 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
                     {},
                 )
 
+    annotation_problems: list[str] = []
+    for version, catalog in catalogs.items():
+        version_rels = known_rels.get(version, {})
+        version_functions = known_functions.get(version, {})
+        if not version_rels:
+            continue
+        for (program, rel), (library, module) in sorted(catalog.unit_map.items()):
+            if rel not in version_rels.get(program, set()):
+                annotation_problems.append(
+                    f"{version}: unit annotation {program}/{rel} "
+                    f"({library}/{module}) does not match any target object"
+                )
+        for (program, name), (library, module) in sorted(
+            catalog.function_map.items()
+        ):
+            if name not in version_functions.get(program, set()):
+                annotation_problems.append(
+                    f"{version}: function annotation {program}:{name} "
+                    f"({library}/{module}) does not match any target function"
+                )
+
     def empty_measures() -> dict:
         return {
             "functions": 0,
@@ -884,7 +1032,7 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
             library_records, key=lambda record: record["name"]
         ),
     }
-    return result, matched_by_unit
+    return result, matched_by_unit, annotation_problems
 
 def percent(matched: int, total: int) -> str:
     if total <= 0:
@@ -1147,7 +1295,13 @@ def main() -> int:
         return 2
 
     report = load_report(args.report)
-    result, matched_by_unit = compute(report, args.asm_build_root)
+    result, matched_by_unit, annotation_problems = compute(
+        report, args.asm_build_root
+    )
+    for problem in annotation_problems:
+        print(f"error: stale library annotation: {problem}", file=sys.stderr)
+    if annotation_problems:
+        return 1
 
     progress_path = args.progress
     if progress_path.is_file():

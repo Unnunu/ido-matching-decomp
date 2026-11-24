@@ -12,8 +12,23 @@ make both
 make objdiff
 ```
 
-`make objdiff` regenerates `objdiff.json` for 5.3 and 7.1. It does not build the
-objects itself; run `make both` first after a clean checkout.
+`make objdiff` regenerates `objdiff.json` for 5.3 and 7.1 and builds any stale
+objects first (`objdiff` depends on `build`).
+
+## Automatic rebuilds
+
+`objdiff.json` sets `build_base: true` and configures
+`tools/objdiff_make.py` as `custom_make`. The wrapper reads the version from
+the object path and runs `make VERSION=<version> <object>`:
+
+- In the GUI, the **Build** button and the on-save watcher rebuild the selected
+  unit's base object and re-run the diff.
+- `make diff` rebuilds stale objects and regenerates `objdiff.json` before
+  invoking `objdiff-cli`.
+
+`objdiff-cli diff` itself never builds; it always reads the existing `.o`
+files. Use `make diff` for the automatic path, or run `make both`/`make
+objdiff` first when calling `objdiff-cli` directly.
 
 ## Units
 
@@ -88,10 +103,45 @@ The mapping direction is **target -> base**:
 Symbols ending in `.NON_MATCHING` are ignored. Optional overrides live in
 `symbols/<version>/<program>.match_overrides.txt`.
 
+## Base symbol mirroring
+
+The IDO compiler does not always emit names for local data and static
+functions. spimdisasm, however, names the matching target symbols
+`RO_STR_...`, `D_...`, `func_...`, and so on. If the base object has no such
+symbols, objdiff cannot pair them: the whole base `.rodata` or `.data` section
+is compared against a synthetic target blob. This can produce misleading
+section scores. Before these fixes, `7.1/cfe/error` reported `.rodata` at 97.2%
+even though all 352 bytes were identical, because objdiff matched 333 bytes and
+treated the other 19 as an insertion.
+
+`tools/symbolize_base.py` copies missing **local** target symbols into the base
+object's `.symtab` with the same section, offset and size. It does not modify
+section contents or relocations. `tools/gen_objdiff.py` runs it for regular
+units, and `tools/objdiff_make.py` runs it after GUI-triggered rebuilds, so the
+base side shows the same `RO_STR_...` names as the target. Library units are
+left unchanged because their base object may be shared by several targets.
+
+The fake section symbol that objdiff adds for "all data in this section" uses
+`STT_OBJECT` symbols to infer its size. The `nonmatching` macro therefore emits
+`.NON_MATCHING` markers as `STT_NOTYPE`; otherwise a size-1 marker near the end
+of `.rodata` makes objdiff think the section is only 333 bytes long. Mirrored
+data symbols are marked `STT_OBJECT` for the same reason. Target assembly
+objects depend on `include/macro.inc`, so changing the macro rebuilds them.
+
 ## Diffing
+
+`make diff` builds stale objects, regenerates `objdiff.json`, and then runs the
+diff:
 
 ```bash
 make diff UNIT=7.1/ugen/build SYM=build_tree
+```
+
+To drive objdiff-cli directly, build first; it does not run make itself:
+
+```bash
+make both
+make objdiff
 objdiff-cli diff -p . -u 7.1/ugen/build build_tree
 ```
 

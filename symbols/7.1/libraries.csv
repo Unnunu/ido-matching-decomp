@@ -111,6 +111,12 @@ unit,uopt,uopt_098640,libp,runtime
 unit,uopt,uopt_098760,libp,runtime
 function,as0,gethostsex,libmld,sex
 function,as0,ldfsymorder,libmld,st
+function,as0,st_error,libmld,st
+function,as0,st_feinit,libmld,st
+function,as0,st_internal,libmld,st
+function,as0,st_printf_2,libmld,st
+function,as0,st_printf_3,libmld,st
+function,as0,st_warning,libmld,st
 function,as1,__st_range_mbt_ascii,libp,runtime
 function,as1,dispose,libp,textoutput
 function,as1,eof,libu,uscan

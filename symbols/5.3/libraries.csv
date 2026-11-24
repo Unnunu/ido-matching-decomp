@@ -32,11 +32,18 @@ function,as0,alloc_release,libp,runtime
 function,as0,alloc_resize,libp,runtime
 function,as0,alloc_scb,libp,runtime
 function,as0,gethostsex,libmld,sex
+function,as0,st_error,libmld,st
+function,as0,st_feinit,libmld,st
+function,as0,st_internal,libmld,st
+function,as0,st_printf_2,libmld,st
+function,as0,st_printf_3,libmld,st
+function,as0,st_warning,libmld,st
 function,as0,xfree,libp,runtime
 function,as0,xmalloc,libp,runtime
 function,as0,xrealloc,libp,runtime
 function,cc,gethostsex,libmld,sex
 function,cfe,__sgi_mld_st_commonbegin,libmld,st
+function,cfe,__st_range_mbt_ascii,libp,runtime
 function,cfe,_md_st_currentifd,libmld,st
 function,cfe,_md_st_error,libmld,st
 function,cfe,_md_st_iextmax,libmld,st
@@ -67,6 +74,7 @@ function,cfe,st_changedn,libmld,st
 function,cfe,st_cuinit,libmld,st
 function,cfe,st_currentifd,libmld,st
 function,cfe,st_currentpchdr,libmld,st
+function,cfe,st_dump,libmld,st
 function,cfe,st_endallfiles,libmld,st
 function,cfe,st_error,libmld,st
 function,cfe,st_extadd,libmld,st
@@ -102,6 +110,7 @@ function,cfe,st_pext_dn,libmld,st
 function,cfe,st_pext_iext,libmld,st
 function,cfe,st_pline_ifd_iline,libmld,st
 function,cfe,st_ppd_ifd_isym,libmld,st
+function,cfe,st_printfd,libmld,st
 function,cfe,st_procbegin,libmld,st
 function,cfe,st_procend,libmld,st
 function,cfe,st_psym_idn_offset,libmld,st
