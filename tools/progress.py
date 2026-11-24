@@ -22,6 +22,8 @@ from pathlib import Path
 
 from elftools.elf.elffile import ELFFile
 
+from library import LibraryCatalog, library_base_path
+
 ROOT = Path(__file__).resolve().parent.parent
 
 VERSIONS = ("5.3", "7.1")
@@ -36,6 +38,8 @@ EXCLUDED_NAME_PATTERNS = (
     re.compile(r"^_start$"),
     re.compile(r"^_mcount$"),
     re.compile(r"^__mcount$"),
+    re.compile(r"^_ftext$"),
+    re.compile(r"^_rld_[A-Za-z0-9_]*$"),
     re.compile(r"^_*crt[A-Za-z0-9_]*$"),
     re.compile(r"^_*runtime[A-Za-z0-9_]*$"),
     re.compile(r"^__runtime_[A-Za-z0-9_]*$"),
@@ -283,10 +287,20 @@ def classify_function(
 
 def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
     units: list[dict] = []
+    library_records: list[dict] = []
     matched_by_unit: dict[tuple[str, str, str], set[str]] = {}
     override_cache: dict[tuple[str, str], dict[str, str]] = {}
     report_target_paths: set[Path] = set()
     seen_signatures: dict[tuple[str, str], set[tuple]] = {}
+    catalogs = {version: LibraryCatalog(version) for version in VERSIONS}
+    library_names: set[str] = set()
+    for catalog in catalogs.values():
+        library_names.update(library for library, _module in catalog.unit_map.values())
+        library_names.update(
+            library for library, _module in catalog.function_map.values()
+        )
+    library_report_units: dict[tuple[str, str, str, str, str], dict] = {}
+    library_defined_cache: dict[tuple[str, str, str], set[str]] = {}
 
     def overrides_for(version: str, program: str) -> dict[str, str]:
         key = (version, program)
@@ -299,7 +313,38 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
     def seen_for(version: str, program: str) -> set[tuple]:
         return seen_signatures.setdefault((version, program), set())
 
-    def add_unit(
+    def section_measures(
+        target_sections: dict[str, dict], section_fuzzy: dict[str, float]
+    ) -> dict[str, dict]:
+        sections: dict[str, dict] = {}
+        for section_name in DATA_SECTIONS:
+            total = int(target_sections.get(section_name, {}).get("size", 0))
+            fuzzy = float(section_fuzzy.get(section_name, 0.0))
+            sections[section_name] = {
+                "total": total,
+                "matched": int(round(total * fuzzy / 100.0)),
+            }
+        return sections
+
+    def function_measures(functions: list[dict]) -> tuple[int, int, int, int]:
+        functions_total = len(functions)
+        functions_matched = sum(1 for function in functions if function["matched"])
+        code_total = sum(function["size"] for function in functions)
+        code_matched = sum(
+            function["size"] for function in functions if function["matched"]
+        )
+        return functions_total, functions_matched, code_total, code_matched
+
+    def mark_matched(
+        version: str, program: str, rel: str, functions: list[dict]
+    ) -> None:
+        key = (version, program, rel)
+        matched = matched_by_unit.setdefault(key, set())
+        matched.update(
+            function["name"] for function in functions if function["matched"]
+        )
+
+    def add_program_unit(
         name: str,
         version: str,
         program: str,
@@ -313,25 +358,11 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
         target_sections: dict[str, dict],
         section_fuzzy: dict[str, float],
     ) -> None:
-        functions_total = len(functions)
-        functions_matched = sum(1 for function in functions if function["matched"])
-        code_total = sum(function["size"] for function in functions)
-        code_matched = sum(
-            function["size"] for function in functions if function["matched"]
+        functions_total, functions_matched, code_total, code_matched = (
+            function_measures(functions)
         )
-
-        sections: dict[str, dict] = {}
-        for section_name in DATA_SECTIONS:
-            total = int(target_sections.get(section_name, {}).get("size", 0))
-            fuzzy = float(section_fuzzy.get(section_name, 0.0))
-            sections[section_name] = {
-                "total": total,
-                "matched": int(round(total * fuzzy / 100.0)),
-            }
-
-        matched_by_unit[(version, program, rel)] = {
-            function["name"] for function in functions if function["matched"]
-        }
+        sections = section_measures(target_sections, section_fuzzy)
+        mark_matched(version, program, rel, functions)
 
         units.append(
             {
@@ -357,14 +388,155 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
             }
         )
 
+    def add_library_record(
+        version: str,
+        library: str,
+        module: str,
+        program: str,
+        rel: str,
+        functions: list[dict],
+        target_sections: dict[str, dict],
+        section_fuzzy: dict[str, float],
+        target_path: Path | None,
+    ) -> None:
+        functions_total, functions_matched, code_total, code_matched = (
+            function_measures(functions)
+        )
+        sections = section_measures(target_sections, section_fuzzy)
+        mark_matched(version, program, rel, functions)
+
+        library_records.append(
+            {
+                "name": f"{version}/{library}/{module}/{program}/{rel}",
+                "version": version,
+                "library": library,
+                "module": module,
+                "program": program,
+                "rel": rel,
+                "target_path": (
+                    target_path.relative_to(ROOT).as_posix()
+                    if target_path is not None and target_path.is_relative_to(ROOT)
+                    else None
+                ),
+                "functions": functions_total,
+                "matched_functions": functions_matched,
+                "code": code_total,
+                "matched_code": code_matched,
+                "sections": sections,
+                "function_results": functions,
+            }
+        )
+
+    def add_library_groups(
+        version: str,
+        program: str,
+        rel: str,
+        grouped: dict[tuple[str, str], list[dict]],
+        target_path: Path | None,
+        target_sections: dict[str, dict],
+        section_fuzzy_by_category: dict[tuple[str, str], dict[str, float]],
+        dominant: tuple[str, str] | None,
+    ) -> None:
+        for category, functions in sorted(grouped.items()):
+            library, module = category
+            use_sections = category == dominant
+            add_library_record(
+                version,
+                library,
+                module,
+                program,
+                rel,
+                functions,
+                target_sections if use_sections else {},
+                section_fuzzy_by_category.get(category, {}) if use_sections else {},
+                target_path,
+            )
+
+    def library_defines(
+        version: str, library: str, module: str, name: str
+    ) -> bool:
+        key = (version, library, module)
+        defined = library_defined_cache.get(key)
+        if defined is None:
+            defined = set()
+            base_path = library_base_path(version, library, module)
+            if base_path is not None:
+                defined = {
+                    function["name"]
+                    for function in read_target_functions(base_path)
+                }
+            library_defined_cache[key] = defined
+        return name in defined
+
+    def library_fuzzy(
+        version: str, program: str, rel: str, category: tuple[str, str], name: str
+    ) -> float | None:
+        library, module = category
+        if not library_defines(version, library, module, name):
+            return None
+        report_unit = library_report_units.get(
+            (version, program, rel, library, module)
+        )
+        if report_unit is None:
+            return None
+        for function in report_unit.get("functions", []):
+            if function.get("name") == name:
+                fuzzy = function.get("fuzzy_match_percent")
+                return float(fuzzy) if fuzzy is not None else None
+        return None
+
+    def classify_library_function(
+        name: str,
+        size: int,
+        address: str | None,
+        fuzzy: float | None,
+        action: str | None,
+    ) -> dict:
+        if action == "matched":
+            matched = True
+            reason = "override"
+        else:
+            matched = fuzzy is not None and float(fuzzy) >= 100.0 - 1e-9
+            reason = "matched" if matched else "unmatched"
+
+        return {
+            "name": name,
+            "size": size,
+            "address": address,
+            "fuzzy_match_percent": fuzzy,
+            "matched": matched,
+            "reason": reason,
+        }
+
     for unit in report.get("units", []):
         name = unit.get("name", "")
+        metadata = unit.get("metadata", {})
+        version = name.split("/", 1)[0]
+
+        library_parts = name.split("/", 4)
+        if len(library_parts) == 5 and library_parts[1] in library_names:
+            version, library, module, target_program, target_rel = library_parts
+            library_report_units[
+                (version, target_program, target_rel, library, module)
+            ] = unit
+            continue
+
+        if metadata.get("library"):
+            target_program = metadata.get("target_program")
+            target_rel = metadata.get("target_rel")
+            library = metadata.get("library_name")
+            module = metadata.get("library_module")
+            if target_program and target_rel and library and module:
+                library_report_units[
+                    (version, target_program, target_rel, library, module)
+                ] = unit
+            continue
+
         parts = name.split("/", 2)
         if len(parts) != 3:
             continue
         version, program, rel = parts
 
-        metadata = unit.get("metadata", {})
         source_path = metadata.get("source_path")
         auto_generated = bool(metadata.get("auto_generated", source_path is None))
         complete = bool(metadata.get("complete", True))
@@ -397,7 +569,9 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
         }
 
         overrides = overrides_for(version, program)
-        functions: list[dict] = []
+        catalog = catalogs[version]
+        program_functions: list[dict] = []
+        library_functions: dict[tuple[str, str], list[dict]] = {}
         excluded_functions = 0
 
         for function in unit.get("functions", []):
@@ -416,31 +590,74 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
                 excluded_functions += 1
                 continue
 
-            functions.append(
-                classify_function(
-                    function_name,
-                    int(function.get("size", "0")),
-                    function.get("address"),
-                    function.get("fuzzy_match_percent"),
-                    has_source,
-                    action,
+            fuzzy = function.get("fuzzy_match_percent")
+            category = catalog.category_for(program, rel, function_name)
+            if category is not None:
+                library_functions.setdefault(category, []).append(
+                    classify_library_function(
+                        function_name,
+                        int(function.get("size", "0")),
+                        function.get("address"),
+                        fuzzy,
+                        action,
+                    )
                 )
-            )
+            else:
+                program_functions.append(
+                    classify_function(
+                        function_name,
+                        int(function.get("size", "0")),
+                        function.get("address"),
+                        fuzzy,
+                        has_source,
+                        action,
+                    )
+                )
 
-        add_unit(
-            name,
-            version,
-            program,
-            rel,
-            source_path,
-            auto_generated,
-            complete,
-            functions,
-            excluded_functions,
-            target_path,
-            target_sections,
-            section_fuzzy,
-        )
+        all_library = bool(library_functions) and not program_functions
+        if all_library:
+            dominant = max(
+                library_functions,
+                key=lambda category: sum(
+                    function["size"] for function in library_functions[category]
+                ),
+            )
+            add_library_groups(
+                version,
+                program,
+                rel,
+                library_functions,
+                target_path,
+                target_sections,
+                {dominant: section_fuzzy},
+                dominant,
+            )
+        else:
+            if program_functions or not library_functions:
+                add_program_unit(
+                    name,
+                    version,
+                    program,
+                    rel,
+                    source_path,
+                    auto_generated,
+                    complete,
+                    program_functions,
+                    excluded_functions,
+                    target_path,
+                    target_sections,
+                    section_fuzzy,
+                )
+            add_library_groups(
+                version,
+                program,
+                rel,
+                library_functions,
+                target_path,
+                {},
+                {},
+                None,
+            )
 
     # Count target-only units as unmatched.  Report units are the source of
     # truth for matches, but the denominator must include every target
@@ -449,6 +666,7 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
         version_dir = asm_build_root / version
         if not version_dir.is_dir():
             continue
+        catalog = catalogs[version]
         for program_dir in sorted(path for path in version_dir.iterdir() if path.is_dir()):
             program = program_dir.name
             for target_path in sorted(program_dir.rglob("*.o")):
@@ -472,7 +690,9 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
 
                 rel = target_path.relative_to(program_dir).with_suffix("").as_posix()
                 overrides = overrides_for(version, program)
-                functions = []
+                unit_library = catalog.unit_category(program, rel)
+                program_functions = []
+                library_functions: dict[tuple[str, str], list[dict]] = {}
                 excluded_functions = 0
 
                 for function in target_functions:
@@ -486,18 +706,100 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
                         excluded_functions += 1
                         continue
 
-                    functions.append(
-                        classify_function(
-                            function_name,
-                            function["size"],
-                            function["address"],
-                            None,
-                            False,
-                            action,
+                    category = catalog.category_for(program, rel, function_name)
+                    if category is not None:
+                        fuzzy = library_fuzzy(
+                            version, program, rel, category, function_name
                         )
+                        library_functions.setdefault(category, []).append(
+                            classify_library_function(
+                                function_name,
+                                function["size"],
+                                function["address"],
+                                fuzzy,
+                                action,
+                            )
+                        )
+                    else:
+                        program_functions.append(
+                            classify_function(
+                                function_name,
+                                function["size"],
+                                function["address"],
+                                None,
+                                False,
+                                action,
+                            )
+                        )
+
+                all_library = unit_library is not None or (
+                    bool(target_functions) and not program_functions
+                )
+
+                if all_library:
+                    if not library_functions:
+                        continue
+                    if unit_library is not None:
+                        dominant = unit_library
+                    else:
+                        dominant = max(
+                            library_functions,
+                            key=lambda category: sum(
+                                function["size"]
+                                for function in library_functions[category]
+                            ),
+                        )
+                    section_fuzzy_by_category = {}
+                    for category in library_functions:
+                        library, module = category
+                        report_unit = library_report_units.get(
+                            (version, program, rel, library, module)
+                        )
+                        if report_unit is None:
+                            continue
+                        section_fuzzy_by_category[category] = {
+                            section.get("name", ""): float(
+                                section.get("fuzzy_match_percent", 0.0)
+                            )
+                            for section in report_unit.get("sections", [])
+                        }
+                    add_library_groups(
+                        version,
+                        program,
+                        rel,
+                        library_functions,
+                        target_path,
+                        target_sections,
+                        section_fuzzy_by_category,
+                        dominant,
+                    )
+                    continue
+
+                if library_functions:
+                    add_library_groups(
+                        version,
+                        program,
+                        rel,
+                        library_functions,
+                        target_path,
+                        {},
+                        {},
+                        None,
                     )
 
-                add_unit(
+                if rel.startswith("pad_") and not library_functions:
+                    continue
+
+                if not program_functions and not library_functions:
+                    has_sections = any(
+                        int(target_sections.get(section_name, {}).get("size", 0))
+                        > 0
+                        for section_name in DATA_SECTIONS
+                    )
+                    if not has_sections:
+                        continue
+
+                add_program_unit(
                     f"{version}/{program}/{rel}",
                     version,
                     program,
@@ -505,7 +807,7 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
                     None,
                     True,
                     False,
-                    functions,
+                    program_functions,
                     excluded_functions,
                     target_path,
                     target_sections,
@@ -531,7 +833,7 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
         target["matched_functions"] += unit["matched_functions"]
         target["code"] += unit["code"]
         target["matched_code"] += unit["matched_code"]
-        target["excluded_functions"] += unit["excluded_functions"]
+        target["excluded_functions"] += unit.get("excluded_functions", 0)
         target["units"] += 1
         for section_name in DATA_SECTIONS:
             target["sections"][section_name]["total"] += unit["sections"][section_name][
@@ -542,38 +844,47 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict]:
             ]["matched"]
 
     programs: dict[str, dict] = {}
+    libraries: dict[str, dict] = {}
     versions: dict[str, dict] = {}
     for unit in units:
         program_key = f"{unit['version']}/{unit['program']}"
         add_measures(programs.setdefault(program_key, empty_measures()), unit)
         add_measures(versions.setdefault(unit["version"], empty_measures()), unit)
+    for record in library_records:
+        library_key = f"{record['version']}/{record['library']}"
+        add_measures(libraries.setdefault(library_key, empty_measures()), record)
+        add_measures(versions.setdefault(record["version"], empty_measures()), record)
 
     totals = empty_measures()
     totals["units"] = 0
-    for program in programs.values():
-        totals["functions"] += program["functions"]
-        totals["matched_functions"] += program["matched_functions"]
-        totals["code"] += program["code"]
-        totals["matched_code"] += program["matched_code"]
-        totals["excluded_functions"] += program["excluded_functions"]
-        totals["units"] += program["units"]
-        for section_name in DATA_SECTIONS:
-            totals["sections"][section_name]["total"] += program["sections"][
-                section_name
-            ]["total"]
-            totals["sections"][section_name]["matched"] += program["sections"][
-                section_name
-            ]["matched"]
+    for scope in (programs, libraries):
+        for value in scope.values():
+            totals["functions"] += value["functions"]
+            totals["matched_functions"] += value["matched_functions"]
+            totals["code"] += value["code"]
+            totals["matched_code"] += value["matched_code"]
+            totals["excluded_functions"] += value["excluded_functions"]
+            totals["units"] += value["units"]
+            for section_name in DATA_SECTIONS:
+                totals["sections"][section_name]["total"] += value["sections"][
+                    section_name
+                ]["total"]
+                totals["sections"][section_name]["matched"] += value["sections"][
+                    section_name
+                ]["matched"]
 
     result = {
         "schema_version": SCHEMA_VERSION,
         "versions": {key: versions[key] for key in sorted(versions)},
         "programs": {key: programs[key] for key in sorted(programs)},
+        "libraries": {key: libraries[key] for key in sorted(libraries)},
         "totals": totals,
         "units": sorted(units, key=lambda unit: unit["name"]),
+        "library_units": sorted(
+            library_records, key=lambda record: record["name"]
+        ),
     }
     return result, matched_by_unit
-
 
 def percent(matched: int, total: int) -> str:
     if total <= 0:
@@ -588,6 +899,7 @@ def section_percent(measures: dict, section_name: str) -> str:
 
 def render_markdown(result: dict) -> str:
     programs = result["programs"]
+    libraries = result.get("libraries", {})
     versions = result["versions"]
 
     lines = [
@@ -612,11 +924,22 @@ def render_markdown(result: dict) -> str:
             if program_version != version:
                 continue
             lines.append(row(version, program_name, programs[key]))
+        for key in sorted(libraries):
+            library_version, library_name = key.split("/", 1)
+            if library_version != version:
+                continue
+            lines.append(row(version, f"{library_name} (library)", libraries[key]))
         lines.append(row(version, "**subtotal**", versions[version]))
 
     lines.append(row("**all**", "", result["totals"]))
     lines.append("")
     lines.append("Percentages are matched byte percentages.")
+    lines.append("")
+    lines.append(
+        "Library rows are statically linked library code found in target "
+        "objects. They are counted separately from the program that embeds "
+        "them; see `symbols/<version>/libraries.csv`."
+    )
     lines.append("")
     return "\n".join(lines)
 
@@ -764,6 +1087,10 @@ def baseline_from_result(result: dict) -> dict:
             key: baseline_measures(value)
             for key, value in sorted(result["programs"].items())
         },
+        "libraries": {
+            key: baseline_measures(value)
+            for key, value in sorted(result.get("libraries", {}).items())
+        },
         "totals": baseline_measures(result["totals"]),
     }
 
@@ -772,7 +1099,7 @@ def compare_baseline(result: dict, baseline: dict) -> list[str]:
     failures: list[str] = []
     current = baseline_from_result(result)
 
-    for scope in ("programs", "versions", "totals"):
+    for scope in ("programs", "libraries", "versions", "totals"):
         old_scope = baseline.get(scope, {})
         new_scope = current[scope]
         if scope == "totals":

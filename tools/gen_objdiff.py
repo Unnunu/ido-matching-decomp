@@ -17,6 +17,14 @@ from pathlib import Path
 
 from elftools.elf.elffile import ELFFile
 
+from library import (
+    LibraryCatalog,
+    library_base_path,
+    library_category_id,
+    library_category_name,
+    library_source_path,
+)
+
 ROOT = Path(__file__).resolve().parent.parent
 BUILD = ROOT / "build"
 SRC = ROOT / "src"
@@ -149,6 +157,14 @@ def read_symbols(path: Path) -> list[tuple[str, int, int, str]]:
         return result
 
 
+def target_function_names(path: Path) -> set[str]:
+    names: set[str] = set()
+    for section, _value, _size, name in read_symbols(path):
+        if section == ".text":
+            names.add(name)
+    return names
+
+
 def symbol_mappings(target_path: Path, base_path: Path, version: str, program: str) -> dict[str, str]:
     target_symbols = read_symbols(target_path)
     base_symbols = read_symbols(base_path)
@@ -218,7 +234,10 @@ def generate(versions: list[str], include_missing_base: bool) -> tuple[dict, int
     mapping_count = 0
     skipped_units = 0
 
+    catalogs = {version: LibraryCatalog(version) for version in versions}
+
     for version in versions:
+        catalog = catalogs[version]
         for program, rel, target in target_objects(version):
             source = resolve_source(version, program, rel)
             base: Path | None = None
@@ -229,37 +248,101 @@ def generate(versions: list[str], include_missing_base: bool) -> tuple[dict, int
             if base is None:
                 base = base_for_target(version, program, rel)
 
-            if base is None and not include_missing_base:
-                skipped_units += 1
-                continue
+            target_names = target_function_names(target)
+            unit_library = catalog.unit_category(program, rel)
+            function_libraries = {
+                name: catalog.category_for(program, rel, name)
+                for name in target_names
+            }
+            library_categories = {
+                category
+                for category in function_libraries.values()
+                if category is not None
+            }
+            if unit_library is not None:
+                library_categories.add(unit_library)
+            whole_library = unit_library is not None or (
+                bool(target_names)
+                and all(function_libraries[name] is not None for name in target_names)
+            )
 
-            category_id = f"{version}/{program}"
-            categories.setdefault(category_id, {"id": category_id, "name": f"{version} / {program}"})
+            if not whole_library:
+                if base is None and not include_missing_base:
+                    skipped_units += 1
+                else:
+                    category_id = f"{version}/{program}"
+                    categories.setdefault(
+                        category_id,
+                        {"id": category_id, "name": f"{version} / {program}"},
+                    )
 
-            complete = base is not None
-            if complete:
+                    complete = base is not None
+                    if complete:
+                        complete_units += 1
+
+                    metadata: dict = {
+                        "complete": complete,
+                        "auto_generated": source is None,
+                        "progress_categories": [category_id],
+                    }
+                    if source is not None:
+                        metadata["source_path"] = source.relative_to(ROOT).as_posix()
+
+                    unit: dict = {
+                        "name": f"{version}/{program}/{rel}",
+                        "target_path": target.relative_to(ROOT).as_posix(),
+                        "symbol_mappings": {},
+                        "metadata": metadata,
+                    }
+                    if base is not None:
+                        unit["base_path"] = base.relative_to(ROOT).as_posix()
+                        unit["symbol_mappings"] = symbol_mappings(
+                            target, base, version, program
+                        )
+                        mapping_count += len(unit["symbol_mappings"])
+
+                    units.append(unit)
+
+            for library, module in sorted(library_categories):
+                library_base = library_base_path(version, library, module)
+                if library_base is None:
+                    continue
+
+                category_id = library_category_id(version, library)
+                categories.setdefault(
+                    category_id,
+                    {
+                        "id": category_id,
+                        "name": library_category_name(version, library),
+                    },
+                )
+
                 complete_units += 1
+                library_source = library_source_path(version, library, module)
+                metadata = {
+                    "complete": True,
+                    "auto_generated": False,
+                    "library": True,
+                    "library_name": library,
+                    "library_module": module,
+                    "target_program": program,
+                    "target_rel": rel,
+                    "progress_categories": [category_id],
+                }
+                if library_source is not None:
+                    metadata["source_path"] = library_source.relative_to(ROOT).as_posix()
 
-            metadata: dict = {
-                "complete": complete,
-                "auto_generated": source is None,
-                "progress_categories": [category_id],
-            }
-            if source is not None:
-                metadata["source_path"] = source.relative_to(ROOT).as_posix()
-
-            unit: dict = {
-                "name": f"{version}/{program}/{rel}",
-                "target_path": target.relative_to(ROOT).as_posix(),
-                "symbol_mappings": {},
-                "metadata": metadata,
-            }
-            if base is not None:
-                unit["base_path"] = base.relative_to(ROOT).as_posix()
-                unit["symbol_mappings"] = symbol_mappings(target, base, version, program)
-                mapping_count += len(unit["symbol_mappings"])
-
-            units.append(unit)
+                library_unit: dict = {
+                    "name": f"{version}/{library}/{module}/{program}/{rel}",
+                    "target_path": target.relative_to(ROOT).as_posix(),
+                    "base_path": library_base.relative_to(ROOT).as_posix(),
+                    "symbol_mappings": symbol_mappings(
+                        target, library_base, version, program
+                    ),
+                    "metadata": metadata,
+                }
+                mapping_count += len(library_unit["symbol_mappings"])
+                units.append(library_unit)
 
     return {
         "min_version": MIN_VERSION,
