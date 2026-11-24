@@ -60,7 +60,7 @@ make disasm
 make
 ```
 
-Diff: `./diff.py -mwob --objfile build/src/7.1/cc/cc.o main`
+Diff: see `docs/DIFFING.md` (objdiff), e.g. `make diff UNIT=7.1/ugen/build SYM=build_tree`.
 
 ## Sources
 

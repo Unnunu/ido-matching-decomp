@@ -166,7 +166,7 @@ build/src/5.3/mld/%.o: OPTFLAGS := -O2
 
 # Targets
 
-.PHONY: all build check check-legacy both clean distclean setup uv-sync disasm disasm-all objdiff diff match progress baseline
+.PHONY: all build check both clean distclean setup uv-sync disasm disasm-all objdiff diff match progress baseline
 .DEFAULT_GOAL:= all
 
 all: build
@@ -176,10 +176,6 @@ all: build
 	fi
 
 build: $(ELFS) $(O_FILES)
-
-# Legacy exact object comparison.  Stage 4 removes the legacy diff tools.
-check-legacy: build
-	$(PYTHON) tools/diff_objfiles.py $(VERSION)
 
 # Full progress pass.  Fails when PROGRESS.md is stale or when matched counts
 # dropped below build/baseline.json.
