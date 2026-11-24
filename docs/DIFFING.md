@@ -120,12 +120,18 @@ section scores. Before these fixes, `7.1/cfe/error` reported `.rodata` at 97.2%
 even though all 352 bytes were identical, because objdiff matched 333 bytes and
 treated the other 19 as an insertion.
 
-`tools/symbolize_base.py` copies missing **local** target symbols into the base
-object's `.symtab` with the same section, offset and size. It does not modify
-section contents or relocations. `tools/gen_objdiff.py` runs it for regular
-units, and `tools/objdiff_make.py` runs it after GUI-triggered rebuilds, so the
-base side shows the same `RO_STR_...` names as the target. Library units are
-left unchanged because their base object may be shared by several targets.
+`tools/symbolize_base.py` copies missing target symbols into the base object's
+`.symtab` with the same section, offset and size. It mirrors all missing local
+symbols, plus global target data symbols when the base has no name for that
+range. The latter covers static data that the compiler left unnamed in the base
+even though its bytes are present; for example, `7.1/ugen/release_id` has a
+global `__Release_ID` in the target and only an anonymous `.rodata` section in
+the base. Without the name objdiff drops the whole data section from the report
+even when all 96 bytes are identical. It does not modify section contents or
+relocations. `tools/gen_objdiff.py` runs it for regular units, and
+`tools/objdiff_make.py` runs it after GUI-triggered rebuilds, so the base side
+shows the same `RO_STR_...` names as the target. Library units are left
+unchanged because their base object may be shared by several targets.
 
 The fake section symbol that objdiff adds for "all data in this section" uses
 `STT_OBJECT` symbols to infer its size. The `nonmatching` macro therefore emits

@@ -95,25 +95,33 @@ def read_symbols(path: Path) -> list[Symbol]:
     return symbols
 
 
-def section_sizes(path: Path) -> dict[str, int]:
+def section_info(path: Path) -> dict[str, tuple[int, bool]]:
     with path.open("rb") as f:
         elf = ELFFile(f)
-        return {section.name: section["sh_size"] for section in elf.iter_sections()}
+        return {
+            section.name: (section["sh_size"], bool(section["sh_flags"] & 0x4))
+            for section in elf.iter_sections()
+        }
 
 
-def missing_local_symbols(target: Path, base: Path) -> list[Symbol]:
+def missing_symbols(target: Path, base: Path) -> list[Symbol]:
     target_symbols = read_symbols(target)
     base_symbols = read_symbols(base)
     base_keys = {(symbol.section, symbol.value, symbol.size) for symbol in base_symbols}
     base_names = {symbol.name for symbol in base_symbols}
-    base_sections = section_sizes(base)
+    base_sections = section_info(base)
 
     additions: list[Symbol] = []
     for symbol in target_symbols:
-        if symbol.bind != "STB_LOCAL":
+        info = base_sections.get(symbol.section)
+        if info is None:
             continue
-        section_size = base_sections.get(symbol.section)
-        if section_size is None:
+        section_size, executable = info
+        # Local symbols are mirrored everywhere.  Global data symbols are also
+        # mirrored when the base has no name for them: a static const such as
+        # __Release_ID can be unnamed in the base object even though the bytes
+        # are present.  Without the name objdiff drops the whole data section.
+        if symbol.bind != "STB_LOCAL" and executable:
             continue
         if symbol.value > section_size or symbol.size > section_size - symbol.value:
             continue
@@ -170,12 +178,12 @@ def patch_symbol_metadata(path: Path, additions: list[Symbol]) -> None:
 
 
 def symbolize_base(target: Path, base: Path) -> int:
-    """Add target-only local symbols to *base* and return the number added."""
+    """Add target-only symbols to *base* and return the number added."""
 
     if not target.is_file() or not base.is_file():
         return 0
 
-    additions = missing_local_symbols(target, base)
+    additions = missing_symbols(target, base)
     if not additions:
         return 0
 
@@ -188,8 +196,9 @@ def symbolize_base(target: Path, base: Path) -> int:
         shutil.copy2(base, temp)
         command = [objcopy_command()]
         for symbol in additions:
+            bind = "global" if symbol.bind == "STB_GLOBAL" else "local"
             command.append(
-                f"--add-symbol={symbol.name}={symbol.section}:{symbol.value},local"
+                f"--add-symbol={symbol.name}={symbol.section}:{symbol.value},{bind}"
             )
         command.append(str(temp))
         subprocess.run(command, check=True)
@@ -211,7 +220,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     count = symbolize_base(args.target, args.base)
-    print(f"Added {count} local symbol(s) to {args.base}")
+    print(f"Added {count} symbol(s) to {args.base}")
     return 0
 
 

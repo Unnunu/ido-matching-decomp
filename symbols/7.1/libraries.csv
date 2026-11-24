@@ -359,6 +359,8 @@ unit,ugen,ugen_070B70,libp,textoutput
 unit,ugen,ugen_070CC0,libp,runtime
 unit,ugen,ugen_070D10,libp,runtime
 unit,ugen,ugen_070D80,libp,runtime
+# Combined runtime/library .data split (libu, libmld, libp, libc and padding).
+unit,ugen,ugen_077060,libp,runtime
 unit,umerge,umerge_022F60,libu,uini
 unit,umerge,umerge_0231C0,libmld,st
 unit,umerge,umerge_023410,libmld,st
