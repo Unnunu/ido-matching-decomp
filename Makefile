@@ -80,6 +80,8 @@ MIPS_GCC   := $(MIPS_BINUTILS_PREFIX)gcc
 
 DISASSEMBLER  := $(PYTHON) -m spimdisasm.elfObjDisasm
 DISASSEMBLER_FLAGS += --no-emit-cpload --Mreg-names o32 --no-use-fpccsr --rodata-string-guesser 4 --pascal-rodata-string-guesser 4 --print-new-file-boundaries --asm-jtbl-label jlabel --asm-data-label dlabel
+RELOC_ADDRS_FILE = $(SYMBOLS)/$(VERSION)/$*.reloc_addrs.txt
+RELOC_ADDRS_FLAG = $(if $(wildcard $(RELOC_ADDRS_FILE)),--reloc-addrs $(RELOC_ADDRS_FILE))
 ASM_PROCESSOR := $(PYTHON) $(ROOTDIR)/tools/asm-processor/build.py
 YACC := $(YACCDIR)/yacc
 YFLAGS := -p $(YACCDIR)/yaccpar -t
@@ -224,7 +226,10 @@ setup: uv-sync $(RECOMP) $(YACC)
 yacc: $(YACC)
 
 disasm: $(DISASM_TARGETS)
-	find asm -type f -name "*.s" | grep -v "/functions/" | xargs sed -i -e "s/glabel func_/llabel func_/; s/dlabel RO_/llabel RO_/; s/dlabel B_/llabel B_/; s/dlabel D_/llabel D_/; s/dlabel jtbl_/llabel jtbl_/;"
+	find asm -type f -name "*.s" | grep -v "/functions/" | xargs sed -i -E \
+		-e 's/^glabel (func_[^ ,]*)([[:space:]]*#.*)?$$/glabel \1, local\2/' \
+		-e 's/^dlabel ((RO_|D_|jtbl_)[^ ,]*)([[:space:]]*#.*)?$$/dlabel \1, local\3/' \
+		-e 's/^dlabel (B_)/llabel \1/'
 
 disasm-all:
 	$(MAKE) VERSION=5.3 disasm
@@ -262,10 +267,10 @@ $(BUILD)/src/$(VERSION)/%.o: src/%.p
 
 # cc is special and is stored in a different folder
 $(ASM)/$(VERSION)/cc/.disasm: $(IRIX_USR_DIR)/bin/cc
-	$(DISASSEMBLER) $(DISASSEMBLER_FLAGS) --file-splits $(SYMBOLS)/$(VERSION)/cc.splits.csv --split-functions $(ASM)/$(VERSION)/functions/cc --save-context $(CONTEXT)/$(VERSION)/cc.csv $< $(dir $@)
+	$(DISASSEMBLER) $(DISASSEMBLER_FLAGS) $(RELOC_ADDRS_FLAG) --file-splits $(SYMBOLS)/$(VERSION)/cc.splits.csv --split-functions $(ASM)/$(VERSION)/functions/cc --save-context $(CONTEXT)/$(VERSION)/cc.csv $< $(dir $@)
 
 $(ASM)/$(VERSION)/%/.disasm:
-	$(DISASSEMBLER) $(DISASSEMBLER_FLAGS) --file-splits $(SYMBOLS)/$(VERSION)/$*.splits.csv --split-functions $(ASM)/$(VERSION)/functions/$* --save-context $(CONTEXT)/$(VERSION)/$*.csv $(IRIX_USR_DIR)/lib/$* $(ASM)/$(VERSION)/$*
+	$(DISASSEMBLER) $(DISASSEMBLER_FLAGS) $(RELOC_ADDRS_FLAG) --file-splits $(SYMBOLS)/$(VERSION)/$*.splits.csv --split-functions $(ASM)/$(VERSION)/functions/$* --save-context $(CONTEXT)/$(VERSION)/$*.csv $(IRIX_USR_DIR)/lib/$* $(ASM)/$(VERSION)/$*
 
 print-% : ; $(info $* is a $(flavor $*) variable set to [$($*)]) @true
 
