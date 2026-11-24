@@ -12,8 +12,12 @@ File format (comma separated, one annotation per line)::
     function,ugen,uputinit,libu,ucio
 
 ``kind=unit`` marks every function in ``<program>/<target>`` as library code.
+A unit row also works for data-only splits: the target object has no functions,
+but its ``.data``/``.rodata`` sections are counted in the library bucket.
 ``kind=function`` marks one function name in that program.  Function rows take
-precedence over unit rows.  Anything not listed stays program code.
+precedence over unit rows.  Anything not listed stays program code.  Split
+objects that mix program and library data are left as program code until
+section-level annotations exist.
 
 Library categories currently used:
 

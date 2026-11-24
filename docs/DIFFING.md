@@ -65,6 +65,12 @@ function,ugen,uputinit,libu,ucio
 - The split CSVs are not extended because they describe object boundaries and
   are consumed by spimdisasm. A split object can mix program and library code,
   so membership has to be tracked per function as well as per object.
+- A `kind=unit` row also works for a data-only split (a target object with no
+  functions). Its `.data`/`.rodata` sections are then counted in the library
+  bucket instead of the program bucket. Pure-library data-only splits are
+  identified by cross-references: every external reference to their symbols
+  comes from library functions. Data-only splits that mix program and library
+  data are left as program code until section-level annotations exist.
 
 `tools/gen_objdiff.py` emits extra library units for categories with a built
 base object (`libu`, `libp`, `libmld`; `libmld` uses the `mld` source/build
@@ -204,8 +210,10 @@ and `libc` rows instead of the program that embeds them. A function is
 assigned to exactly one bucket: function rows first, then unit rows, otherwise
 the program. `pad_*` target objects that contain only padding are ignored;
 `pad_*` objects that contain a library function stay in the library bucket.
-Library rows are included in version subtotals, the all-versions total and the
-regression baseline.
+Data-only library units also contribute their `.data`/`.rodata` sections to the
+library rows even though they have no functions; they are never added to a
+program. Library rows are included in version subtotals, the all-versions total
+and the regression baseline.
 
 The table also reports `.data` and `.rodata` byte match percentages. They use
 objdiff section match percentages; target-only units contribute their full

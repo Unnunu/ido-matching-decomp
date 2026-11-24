@@ -865,6 +865,35 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict, list[str]]:
 
                 if all_library:
                     if not library_functions:
+                        if unit_library is not None:
+                            library, module = unit_library
+                            section_fuzzy = {}
+                            report_unit = library_report_units.get(
+                                (version, program, rel, library, module)
+                            )
+                            if report_unit is not None:
+                                section_fuzzy = {
+                                    section.get("name", ""): float(
+                                        section.get("fuzzy_match_percent", 0.0)
+                                    )
+                                    for section in report_unit.get("sections", [])
+                                }
+                            if any(
+                                int(target_sections.get(section_name, {}).get("size", 0))
+                                > 0
+                                for section_name in DATA_SECTIONS
+                            ):
+                                add_library_record(
+                                    version,
+                                    library,
+                                    module,
+                                    program,
+                                    rel,
+                                    [],
+                                    target_sections,
+                                    section_fuzzy,
+                                    target_path,
+                                )
                         continue
                     if unit_library is not None:
                         dominant = unit_library
