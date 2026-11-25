@@ -101,6 +101,11 @@ into `tools/ido_recomp/` and builds `tools/yacc/yacc`. `make disasm`
 disassembles the original binaries from `ido/<version>/` into `asm/<version>/`.
 `make` then builds the current version into `build/src/<version>/`.
 
+Disassembly is incremental: after a successful run each program gets a
+`.disasm` stamp, and it is regenerated only when its binary, split CSV, address
+override files, or the `Makefile` change. Use `make -B disasm` to force a
+regeneration.
+
 The original IDO binaries under `ido/` and the split definitions under
 `symbols/` are tracked, so no external IDO installation is needed.
 
