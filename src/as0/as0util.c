@@ -136,7 +136,8 @@ void make_local_label(char* name, size_t* out_len) {
     last_c = token_tmp[name_len - 1];
 
     if (i > 0xFF) {
-        posterror("Local label number is out of range\0\0No such label", token_tmp, 1);
+        posterror("Local label number is out of range", token_tmp, 1);
+        stubbed_printf("No such label");
         i = 0;
     }
 
