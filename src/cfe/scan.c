@@ -617,7 +617,7 @@ out:
         }
 
         if (!options[OPTION_CPLUSPLUS] && !(options[OPTION_ANSI_MODE] & 1) &&
-            BASIC_TYPE(long_type).size == BASIC_TYPE(int_type).size) {
+            BASIC_TYPE(int_type).size == BASIC_TYPE(long_type).size) {
             if (TREE_TYPE(yylval.node) == long_type) {
                 TREE_TYPE(yylval.node) = int_type;
             } else if (TREE_TYPE(yylval.node) == ulong_type) {
