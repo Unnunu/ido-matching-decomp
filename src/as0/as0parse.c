@@ -55,8 +55,8 @@ extern int isStruct;
 
 // as0parse.c
 //.data
-static char* D_10000004[4] = { "", "operand 1", "operand 2", "operand 3" };
 int gform_extn = 0;
+static char* D_10000004[4] = { "", "operand 1", "operand 2", "operand 3" };
 static struct unk_struct* D_10000014 = NULL;
 
 //.bss
