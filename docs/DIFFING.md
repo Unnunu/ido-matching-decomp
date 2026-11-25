@@ -98,6 +98,15 @@ Target assembly often uses names such as `func_0040E238`, while the source uses
 meaningful names. `tools/gen_objdiff.py` reads both ELF symbol tables and maps
 target symbols to base symbols with the same section, offset, and size.
 
+Offset pairing is only meaningful when the target and base section layouts are
+aligned. If most same-named symbols sit at different offsets on the two sides
+(the target has a different global set or declaration order), the generator
+treats the section as misaligned and emits no mappings for it. This prevents
+meaningless pairs such as `Fflag -> Kflag` in `5.3/cc/cc`, where the base `.data`
+is shifted relative to the target. A section needs at least 8 common names
+before this check applies. Explicit `matched` overrides still work for
+misaligned sections.
+
 The mapping direction is **target -> base**:
 
 ```json

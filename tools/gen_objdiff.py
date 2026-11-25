@@ -174,6 +174,54 @@ def target_function_names(path: Path) -> set[str]:
     return names
 
 
+MISALIGNED_MIN_COMMON = 8
+MISALIGNED_SHIFTED_NUM = 2
+MISALIGNED_SHIFTED_DEN = 3
+
+
+def misaligned_sections(
+    target_symbols: list[tuple[str, int, int, str]],
+    base_symbols: list[tuple[str, int, int, str]],
+) -> set[str]:
+    """Return sections where offset-based pairing is unreliable.
+
+    If most same-named symbols sit at different offsets on the target and base
+    sides, the section layouts are shifted (for example a different global set
+    or declaration order).  Pairing target and base symbols by offset then
+    produces meaningless mappings, so no offset mappings are emitted for that
+    section.  Sections with too few common names are left alone.
+    """
+
+    target_by_name: dict[str, tuple[str, int]] = {
+        name: (section, value) for section, value, _size, name in target_symbols
+    }
+    base_by_name: dict[str, tuple[str, int]] = {
+        name: (section, value) for section, value, _size, name in base_symbols
+    }
+
+    common: dict[str, int] = defaultdict(int)
+    same_offset: dict[str, int] = defaultdict(int)
+    for name, (target_section, target_value) in target_by_name.items():
+        base_symbol = base_by_name.get(name)
+        if base_symbol is None:
+            continue
+        base_section, base_value = base_symbol
+        if base_section != target_section:
+            continue
+        common[target_section] += 1
+        if base_value == target_value:
+            same_offset[target_section] += 1
+
+    misaligned: set[str] = set()
+    for section, total in common.items():
+        if total < MISALIGNED_MIN_COMMON:
+            continue
+        shifted = total - same_offset[section]
+        if shifted * MISALIGNED_SHIFTED_DEN > total * MISALIGNED_SHIFTED_NUM:
+            misaligned.add(section)
+    return misaligned
+
+
 def symbol_mappings(target_path: Path, base_path: Path, version: str, program: str) -> dict[str, str]:
     target_symbols = read_symbols(target_path)
     base_symbols = read_symbols(base_path)
@@ -188,8 +236,12 @@ def symbol_mappings(target_path: Path, base_path: Path, version: str, program: s
     for section, value, size, name in base_symbols:
         base_by_key[(section, value, size)].add(name)
 
+    skip_sections = misaligned_sections(target_symbols, base_symbols)
+
     mappings: dict[str, str] = {}
     for key, target_names in target_by_key.items():
+        if key[0] in skip_sections:
+            continue
         if len(target_names) != 1:
             continue
         base_names = base_by_key.get(key, set())
