@@ -1056,6 +1056,8 @@ static void func_004076A0(int fasm) {
     }
 }
 
+// NON_MATCHING in 7.1, reg swap v1 <-> a3
+
 static void func_00407A20(asmcodes asm_code) {
     sym* sp5C;
     sym* sp58;
@@ -2178,11 +2180,13 @@ static void func_0040AF00(itype iop) {
             CurrentSegment = 0xF;
             break;
         default:
+            if (iop != irdata) {
 #ifdef IDO_71
-            assertion_failed("iop == irdata", "as0parse.c", 2637);
+                assertion_failed("iop == irdata", "as0parse.c", 2637);
 #else
-            assertion_failed("iop == irdata", "as0parse.c", 2627);
+                assertion_failed("iop == irdata", "as0parse.c", 2627);
 #endif
+            }
             break;
     }
 }
@@ -2472,16 +2476,19 @@ static int func_0040BEBC(int* arg0, int* arg1, int* arg2) {
 
         if (sp24->unk10 == 4) {
             GetItem(arg1, arg2);
+#ifndef IDO_71
             return 1;
-        }
-        if (sp24->unk10 == 3) {
+#endif
+        } else if (sp24->unk10 == 3) {
             *arg0 = sp24->unk18;
             nexttoken();
             func_00405A80(arg1, arg2);
 
             if (Tokench == ',') {
                 nexttoken();
+#ifndef IDO_71
                 return 1;
+#endif
             }
         } else {
             posterror("Bad id in expression", &Tstring[0], 1);
@@ -2746,15 +2753,11 @@ static void parse_option(void) {
 
 static int func_0040CC44(char* name) {
     int var_s0;
-    char** var_s1;
-
-    var_s1 = sset_value;
 
     for (var_s0 = 0; var_s0 <= 0x10; var_s0++) {
-        if (strcmp(name, *var_s1) == 0) {
+        if (strcmp(name, sset_value[var_s0]) == 0) {
             return var_s0;
         }
-        var_s1++;
     }
     return 0;
 }

@@ -148,6 +148,10 @@ def is_excluded_name(name: str) -> bool:
     return any(pattern.match(name) for pattern in EXCLUDED_NAME_PATTERNS)
 
 
+def is_excluded_unit(rel: str) -> bool:
+    return is_excluded_name(Path(rel).name)
+
+
 def load_overrides(version: str, program: str) -> dict[str, str]:
     path = ROOT / "symbols" / version / f"{program}.match_overrides.txt"
     if not path.is_file():
@@ -643,6 +647,8 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict, list[str]]:
         if len(parts) != 3:
             continue
         version, program, rel = parts
+        if is_excluded_unit(rel):
+            continue
 
         source_path = metadata.get("source_path")
         auto_generated = bool(metadata.get("auto_generated", source_path is None))
@@ -804,6 +810,8 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict, list[str]]:
                     continue
 
                 rel = target_path.relative_to(program_dir).with_suffix("").as_posix()
+                if is_excluded_unit(rel):
+                    continue
                 known_rels[version][program].add(rel)
 
                 target_functions = read_target_functions(target_path)

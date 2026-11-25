@@ -309,6 +309,7 @@ function,uopt,writeln,libp,textoutput
 # Data-only splits owned by a library (no functions, .data/.rodata only).
 unit,as0,as0_023454,libmld,st
 unit,as0,as0_023690,libp,runtime
+unit,as0,as0_021760,libmld,st
 unit,as0,as0_0217F0,libmld,st
 unit,as0,as0_021900,libmld,st
 unit,as0,as0_0219F0,libmld,st

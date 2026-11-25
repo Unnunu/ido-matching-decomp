@@ -48,7 +48,7 @@ char* sformat_extn[7] = { "franone", "frahi", "fralo", "frarel1", "frarel2", NUL
 char* sframereg = "$framereg";
 char* sframesize = "$framesize";
 
-struct _struct_asm_info_0x8 asm_info[0x1AF] = {
+struct _struct_asm_info_0x8 asm_info[0x1AE] = {
     { "abs", 0x08000420 },
     { "add", 0x060A0421 },
     { "addu", 0x060A8421 },
@@ -479,7 +479,4 @@ struct _struct_asm_info_0x8 asm_info[0x1AF] = {
     { "mfps", 0x08A404E0 },
     { "mtps", 0x08A404E0 },
     { "", 0 },
-    { NULL, 0 },
 };
-
-int map_glevel[4] = { 2, 1, 0, 3 };

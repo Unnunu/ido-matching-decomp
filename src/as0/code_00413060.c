@@ -26,6 +26,8 @@ extern void* xrealloc(void*, unsigned int);
 extern char* st_str_idn(int idn);
 
 // File declarations (code_00413060.c)
+int map_glevel[4] = { 2, 1, 0, 3 };
+
 static int D_10001090 = 0;
 static int D_10001094 = 0;
 static char* D_10001098[5] = { "Internal", "Error", "Warning", "Info", "" };
@@ -192,9 +194,9 @@ void* grow_array(size_t* capacity_count, size_t new_count, size_t width, void* p
 
 // array declaration (Only declared in this file)
 #ifdef IDO_71
-char* opt_strings[0x6E] = {
+char* opt_strings[] = {
 #else
-char* opt_strings[0x6D] = {
+char* opt_strings[] = {
 #endif
     "-EB",
     "-EL",

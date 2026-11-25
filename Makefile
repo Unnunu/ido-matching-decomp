@@ -77,6 +77,8 @@ DISASSEMBLER  := $(PYTHON) -m spimdisasm.elfObjDisasm
 DISASSEMBLER_FLAGS += --no-emit-cpload --Mreg-names o32 --no-use-fpccsr --rodata-string-guesser 4 --pascal-rodata-string-guesser 4 --print-new-file-boundaries --asm-jtbl-label jlabel --asm-data-label dlabel
 RELOC_ADDRS_FILE = $(SYMBOLS)/$(VERSION)/$*.reloc_addrs.txt
 RELOC_ADDRS_FLAG = $(if $(wildcard $(RELOC_ADDRS_FILE)),--reloc-addrs $(RELOC_ADDRS_FILE))
+SYMBOL_ADDRS_FILE = $(SYMBOLS)/$(VERSION)/$*.symbol_addrs.txt
+SYMBOL_ADDRS_FLAG = $(if $(wildcard $(SYMBOL_ADDRS_FILE)),--symbol-addrs $(SYMBOL_ADDRS_FILE))
 YACC := $(YACCDIR)/yacc
 YFLAGS := -p $(YACCDIR)/yaccpar -t
 
@@ -257,10 +259,10 @@ $(BUILD)/src/$(VERSION)/%.o: src/%.p
 
 # cc is special and is stored in a different folder
 $(ASM)/$(VERSION)/cc/.disasm: $(IRIX_USR_DIR)/bin/cc
-	$(DISASSEMBLER) $(DISASSEMBLER_FLAGS) $(RELOC_ADDRS_FLAG) --file-splits $(SYMBOLS)/$(VERSION)/cc.splits.csv --save-context $(CONTEXT)/$(VERSION)/cc.csv $< $(dir $@)
+	$(DISASSEMBLER) $(DISASSEMBLER_FLAGS) $(RELOC_ADDRS_FLAG) $(SYMBOL_ADDRS_FLAG) --file-splits $(SYMBOLS)/$(VERSION)/cc.splits.csv --save-context $(CONTEXT)/$(VERSION)/cc.csv $< $(dir $@)
 
 $(ASM)/$(VERSION)/%/.disasm:
-	$(DISASSEMBLER) $(DISASSEMBLER_FLAGS) $(RELOC_ADDRS_FLAG) --file-splits $(SYMBOLS)/$(VERSION)/$*.splits.csv --save-context $(CONTEXT)/$(VERSION)/$*.csv $(IRIX_USR_DIR)/lib/$* $(ASM)/$(VERSION)/$*
+	$(DISASSEMBLER) $(DISASSEMBLER_FLAGS) $(RELOC_ADDRS_FLAG) $(SYMBOL_ADDRS_FLAG) --file-splits $(SYMBOLS)/$(VERSION)/$*.splits.csv --save-context $(CONTEXT)/$(VERSION)/$*.csv $(IRIX_USR_DIR)/lib/$* $(ASM)/$(VERSION)/$*
 
 print-% : ; $(info $* is a $(flavor $*) variable set to [$($*)]) @true
 

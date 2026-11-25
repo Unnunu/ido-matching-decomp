@@ -151,6 +151,92 @@ def bss_offsets(path: Path) -> dict[str, set[int]]:
     return offsets
 
 
+def bss_label_definitions(target: Path) -> dict[str, Symbol]:
+    """Collect defined ``B_*`` labels from target objects in the same folder.
+
+    Static BSS labels often live in a separate target split object, while the
+    unit that references them (for example ``main``) only has undefined
+    ``B_*`` symbols.  objdiff still needs matching names on the base side, so
+    remember the label definitions from the sibling target objects.
+    """
+
+    definitions: dict[str, Symbol] = {}
+    for path in sorted(target.parent.glob("*.o")):
+        try:
+            with path.open("rb") as f:
+                elf = ELFFile(f)
+                symtab = elf.get_section_by_name(".symtab")
+                if symtab is None:
+                    continue
+                for symbol in symtab.iter_symbols():
+                    name = symbol.name
+                    if not name.startswith("B_") or name.endswith(".NON_MATCHING"):
+                        continue
+                    section_index = symbol["st_shndx"]
+                    if (
+                        not isinstance(section_index, int)
+                        or section_index <= 0
+                        or section_index >= elf.num_sections()
+                    ):
+                        continue
+                    section = elf.get_section(section_index)
+                    if section is None or section["sh_type"] != "SHT_NOBITS":
+                        continue
+                    definitions.setdefault(
+                        name,
+                        Symbol(
+                            section=section.name,
+                            value=symbol["st_value"],
+                            size=0,
+                            name=name,
+                            type="STT_NOTYPE",
+                            bind=symbol["st_info"]["bind"],
+                            is_bss=True,
+                        ),
+                    )
+        except Exception:
+            continue
+    return definitions
+
+
+def undefined_bss_references(target: Path) -> list[Symbol]:
+    """Return synthetic symbols for undefined ``B_*`` names used in relocs."""
+
+    references: list[Symbol] = []
+    names: set[str] = set()
+    with target.open("rb") as f:
+        elf = ELFFile(f)
+        symtab = elf.get_section_by_name(".symtab")
+        if symtab is None:
+            return references
+        for reloc_section in elf.iter_sections():
+            if not reloc_section.name.startswith((".rel", ".rela")):
+                continue
+            for reloc in reloc_section.iter_relocations():
+                symbol = symtab.get_symbol(reloc["r_info_sym"])
+                name = symbol.name
+                if (
+                    not name.startswith("B_")
+                    or name.endswith(".NON_MATCHING")
+                    or symbol["st_shndx"] != "SHN_UNDEF"
+                    or name in names
+                ):
+                    continue
+                names.add(name)
+                references.append(
+                    Symbol(
+                        section=".bss",
+                        value=0,
+                        size=0,
+                        name=name,
+                        type="STT_NOTYPE",
+                        bind="STB_LOCAL",
+                        is_bss=True,
+                    )
+                )
+    return references
+
+
 def relocation_section(elf: ELFFile, section_name: str):
     for prefix in (".rel", ".rela"):
         section = elf.get_section_by_name(f"{prefix}{section_name}")
@@ -170,7 +256,9 @@ def symbol_section(elf: ELFFile, symbol):
     return elf.get_section(section_index)
 
 
-def bss_deltas(target: Path, base: Path) -> dict[str, int]:
+def bss_deltas(
+    target: Path, base: Path, definitions: dict[str, Symbol]
+) -> dict[str, int]:
     """Infer target-to-base BSS offset shifts from matching relocations.
 
     A target split can cover only part of the base ``.bss`` (or the compiler
@@ -219,7 +307,10 @@ def bss_deltas(target: Path, base: Path) -> dict[str, int]:
                     continue
                 target_symbol = target_symtab.get_symbol(reloc["r_info_sym"])
                 base_symbol = base_symtab.get_symbol(base_reloc["r_info_sym"])
+                definition = definitions.get(target_symbol.name)
                 target_bss = symbol_section(target_elf, target_symbol)
+                if target_bss is None and definition is not None:
+                    target_bss = target_elf.get_section_by_name(definition.section)
                 base_bss = symbol_section(base_elf, base_symbol)
                 if target_bss is None or base_bss is None:
                     continue
@@ -239,7 +330,10 @@ def bss_deltas(target: Path, base: Path) -> dict[str, int]:
                 base_imm = struct.unpack_from(
                     endian + "I", base_data, base_reloc["r_offset"]
                 )[0] & 0xFFFF
-                target_offset = target_symbol["st_value"] + target_imm
+                target_value = (
+                    definition.value if definition is not None else target_symbol["st_value"]
+                )
+                target_offset = target_value + target_imm
                 base_offset = base_symbol["st_value"] + base_imm
                 deltas.setdefault(target_bss.name, set()).add(
                     base_offset - target_offset
@@ -262,13 +356,21 @@ def section_info(path: Path) -> dict[str, tuple[int, bool]]:
 
 
 def missing_symbols(target: Path, base: Path) -> tuple[list[Symbol], set[str]]:
+    definitions = bss_label_definitions(target)
     target_symbols = read_symbols(target)
+    by_name = {symbol.name: symbol for symbol in target_symbols}
+    for reference in undefined_bss_references(target):
+        definition = definitions.get(reference.name)
+        if definition is None or reference.name in by_name:
+            continue
+        target_symbols.append(replace(definition))
+        by_name[reference.name] = definition
     base_symbols = read_symbols(base)
     base_keys = {(symbol.section, symbol.value, symbol.size) for symbol in base_symbols}
     base_by_name = {symbol.name: symbol for symbol in base_symbols}
     base_names = symbol_names(base)
     base_bss_offsets = bss_offsets(base)
-    deltas = bss_deltas(target, base)
+    deltas = bss_deltas(target, base, definitions)
     base_sections = section_info(base)
 
     additions: list[Symbol] = []

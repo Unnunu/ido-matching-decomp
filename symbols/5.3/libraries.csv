@@ -194,6 +194,7 @@ function,ugen,xrealloc,libp,runtime
 # Data-only splits owned by a library (no functions, .data/.rodata only).
 unit,as0,as0_020260,libmld,st
 unit,as0,as0_020490,libp,runtime
+unit,as0,as0_027020,libmld,st
 unit,as0,as0_027130,libmld,st
 unit,as0,as0_0271C0,libmld,st
 unit,as0,as0_0272B0,libmld,st
