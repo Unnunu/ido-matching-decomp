@@ -246,8 +246,7 @@ in [PROGRESS.md](PROGRESS.md).
 - `ido/` - original IDO binaries used for disassembly.
 - `lib/indy/dev/usr/lib/` - tracked crt objects from the IDO release.
 - `tools/` - build helpers: `gen_objdiff.py`, `objdiff_make.py`,
-  `symbolize_base.py`, `progress.py`, `library.py`, `asm-processor/` and the
-  bundled `yacc/`.
+  `symbolize_base.py`, `progress.py`, `library.py` and the bundled `yacc/`.
 - `docs/DIFFING.md` - detailed objdiff and progress documentation.
 - `PROGRESS.md` - generated, tracked matching status.
 - `Makefile` - build, disassembly, diff and progress entry points.

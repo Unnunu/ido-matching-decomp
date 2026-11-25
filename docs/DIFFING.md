@@ -237,7 +237,10 @@ make baseline   # explicitly refresh the regression baseline
 
 `tools/progress.py` derives matched functions from the report. Target objects
 without a base object (source files that have not been started yet) are still
-counted in the denominator as unmatched. Duplicate target objects are
+counted in the denominator as unmatched. The report also marks target
+functions with no corresponding base symbol as `100%`; progress therefore
+cross-checks program function names against the base object and treats missing
+ones as unmatched. Target objects Duplicate target objects are
 deduplicated by their function/data signature. The tool excludes `__start`,
 `_mcount`, `_ftext`, `_rld_*`, crt/runtime symbols and `*.NON_MATCHING`
 aliases, and honours `matched`/`ignored` entries in

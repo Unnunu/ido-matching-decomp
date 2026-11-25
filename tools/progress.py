@@ -652,6 +652,12 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict, list[str]]:
         target_path = target_path_for_unit(version, program, rel, asm_build_root)
         report_target_paths.add(target_path)
         known_rels[version][program].add(rel)
+        base_path = asm_build_root.parent / "src" / version / program / f"{rel}.o"
+        base_function_names: set[str] | None = None
+        if base_path.is_file():
+            base_function_names = {
+                function["name"] for function in read_target_functions(base_path)
+            }
         target_sections: dict[str, dict] = {}
         if target_path.is_file():
             target_functions = read_target_functions(target_path)
@@ -720,16 +726,23 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict, list[str]]:
                     )
                 )
             else:
-                program_functions.append(
-                    classify_function(
-                        function_name,
-                        int(function.get("size", "0")),
-                        function.get("address"),
-                        function.get("fuzzy_match_percent"),
-                        has_source,
-                        action,
-                    )
+                result = classify_function(
+                    function_name,
+                    int(function.get("size", "0")),
+                    function.get("address"),
+                    function.get("fuzzy_match_percent"),
+                    has_source,
+                    action,
                 )
+                if (
+                    result["matched"]
+                    and has_source
+                    and base_function_names is not None
+                    and result["name"] not in base_function_names
+                ):
+                    result["matched"] = False
+                    result["reason"] = "no-base"
+                program_functions.append(result)
 
         all_library = bool(library_functions) and not program_functions
         if all_library:

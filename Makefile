@@ -17,11 +17,6 @@ IDO_TC_5.3 := cc cfe as0 ugen
 # Source directories that only belong to one version
 SRC_EXCLUDE_7.1 :=
 SRC_EXCLUDE_5.3 := src/as1
-# Individual source files that only belong to one version.
-# asm-processor does not evaluate #if, so version-gated GLOBAL_ASM files
-# must be excluded from the build instead.
-SRC_EXCLUDE_FILES_7.1 :=
-SRC_EXCLUDE_FILES_5.3 := src/cfe/codegen.c
 
 ifeq ($(VERSION),7.1)
 	IDO_VERSION := IDO_71
@@ -82,7 +77,6 @@ DISASSEMBLER  := $(PYTHON) -m spimdisasm.elfObjDisasm
 DISASSEMBLER_FLAGS += --no-emit-cpload --Mreg-names o32 --no-use-fpccsr --rodata-string-guesser 4 --pascal-rodata-string-guesser 4 --print-new-file-boundaries --asm-jtbl-label jlabel --asm-data-label dlabel
 RELOC_ADDRS_FILE = $(SYMBOLS)/$(VERSION)/$*.reloc_addrs.txt
 RELOC_ADDRS_FLAG = $(if $(wildcard $(RELOC_ADDRS_FILE)),--reloc-addrs $(RELOC_ADDRS_FILE))
-ASM_PROCESSOR := $(PYTHON) $(ROOTDIR)/tools/asm-processor/build.py
 YACC := $(YACCDIR)/yacc
 YFLAGS := -p $(YACCDIR)/yaccpar -t
 
@@ -109,7 +103,6 @@ endif
 LDFLAGS := -nostdlib -L$(RECOMP)/ido/$(VERSION)/usr/lib/ -lc
 
 
-ASMPROCFLAGS := 
 OPTFLAGS := -O1
 MIPS_VERSION := -mips2
 ASFLAGS := -march=vr4300 -32 -Iinclude -KPIC
@@ -131,8 +124,8 @@ ALL_SRC_DIRS := $(shell find src -type d)
 SRC_DIRS := $(filter-out $(SRC_EXCLUDE_$(VERSION)),$(ALL_SRC_DIRS))
 ASM_DIRS := $(shell find asm/$(VERSION) -type d -not -path "asm/$(VERSION)/functions*" 2>/dev/null)
 
-C_FILES  := $(filter-out $(SRC_EXCLUDE_FILES_$(VERSION)),$(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.c)))
-P_FILES  := $(filter-out $(SRC_EXCLUDE_FILES_$(VERSION)),$(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.p))) # Pascal files
+C_FILES  := $(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.c))
+P_FILES  := $(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.p)) # Pascal files
 
 S_FILES  := $(foreach dir,$(ASM_DIRS),$(wildcard $(dir)/*.s))
 COMBINED_S_FILES := $(sort $(foreach file, $(S_FILES:.s=), $(basename $(file))))
@@ -145,15 +138,10 @@ O_FILES  := $(Y_FILES:src/%.y=$(BUILD)/src/$(VERSION)/%.o) \
             $(COMBINED_S_FILES:asm/$(VERSION)/%=$(BUILD)/asm/$(VERSION)/%.o)
 
 # Automatic dependency files
-DEP_FILES := $(O_FILES:.o=.d) \
-             $(O_FILES:.o=.asmproc.d)
+DEP_FILES := $(O_FILES:.o=.d)
 
 # create build directories
 $(shell mkdir -p $(SRC_DIRS:src/%=$(BUILD)/src/$(VERSION)/%) $(ASM_DIRS:asm/$(VERSION)/%=$(BUILD)/asm/$(VERSION)/%))
-
-$(BUILD)/src/%.o: CC_NO_ASMPROC := $(CC)
-$(BUILD)/src/%.o: CC = $(ASM_PROCESSOR) $(ASM_PROC_FLAGS) $(CC_NO_ASMPROC) -- $(AS) $(ASFLAGS) --
-
 
 build/src/7.1/mld/%.o: OPTFLAGS := -O2
 build/src/7.1/as0/%.o: OPTFLAGS := -O2
@@ -258,7 +246,7 @@ $(BUILD)/src/$(VERSION)/%.o: src/%.c
 
 $(BUILD)/src/$(VERSION)/%.o: src/%.p
 	@if [ "$(CC)" != "@:" ]; then \
-		(cd $(dir $<) && $(CC_NO_ASMPROC) -c $(CFLAGS) $(MIPS_VERSION) $(OPTFLAGS) -o $(abspath $@) $(notdir $<)); \
+		(cd $(dir $<) && $(CC) -c $(CFLAGS) $(MIPS_VERSION) $(OPTFLAGS) -o $(abspath $@) $(notdir $<)); \
 	fi
 
 %.c: %.y
@@ -269,10 +257,10 @@ $(BUILD)/src/$(VERSION)/%.o: src/%.p
 
 # cc is special and is stored in a different folder
 $(ASM)/$(VERSION)/cc/.disasm: $(IRIX_USR_DIR)/bin/cc
-	$(DISASSEMBLER) $(DISASSEMBLER_FLAGS) $(RELOC_ADDRS_FLAG) --file-splits $(SYMBOLS)/$(VERSION)/cc.splits.csv --split-functions $(ASM)/$(VERSION)/functions/cc --save-context $(CONTEXT)/$(VERSION)/cc.csv $< $(dir $@)
+	$(DISASSEMBLER) $(DISASSEMBLER_FLAGS) $(RELOC_ADDRS_FLAG) --file-splits $(SYMBOLS)/$(VERSION)/cc.splits.csv --save-context $(CONTEXT)/$(VERSION)/cc.csv $< $(dir $@)
 
 $(ASM)/$(VERSION)/%/.disasm:
-	$(DISASSEMBLER) $(DISASSEMBLER_FLAGS) $(RELOC_ADDRS_FLAG) --file-splits $(SYMBOLS)/$(VERSION)/$*.splits.csv --split-functions $(ASM)/$(VERSION)/functions/$* --save-context $(CONTEXT)/$(VERSION)/$*.csv $(IRIX_USR_DIR)/lib/$* $(ASM)/$(VERSION)/$*
+	$(DISASSEMBLER) $(DISASSEMBLER_FLAGS) $(RELOC_ADDRS_FLAG) --file-splits $(SYMBOLS)/$(VERSION)/$*.splits.csv --save-context $(CONTEXT)/$(VERSION)/$*.csv $(IRIX_USR_DIR)/lib/$* $(ASM)/$(VERSION)/$*
 
 print-% : ; $(info $* is a $(flavor $*) variable set to [$($*)]) @true
 
