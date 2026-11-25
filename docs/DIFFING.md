@@ -190,8 +190,9 @@ relocation becomes `B_...` and the corresponding base relocation stays
 `[.bss]+offset`; `reloc_eq` then treats the identical reference as different.
 `tools/symbolize_base.py` therefore copies missing target `B_...` labels into
 the base, but only when the base has no symbol at the destination offset.
-Existing base names are preserved, and the mirrored labels keep size 0 and
-`STT_NOTYPE`.
+`STT_SECTION` symbols do not occupy an offset: a bare `.bss` section symbol at
+value 0 must not block a mirrored label at base offset 0. Existing base names
+are preserved, and the mirrored labels keep size 0 and `STT_NOTYPE`.
 
 The destination is not always the target offset. A target split can cover only
 part of the base `.bss`, or the compiler can order BSS variables differently;

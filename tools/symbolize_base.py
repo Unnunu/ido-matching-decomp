@@ -140,6 +140,12 @@ def bss_offsets(path: Path) -> dict[str, set[int]]:
         if symtab is None:
             return offsets
         for symbol in symtab.iter_symbols():
+            # Section symbols merely name a section and occupy its base
+            # address; they are not real variables.  Treating the ``.bss``
+            # section symbol as an occupied offset hides a free offset 0, so a
+            # mirrored B_* label would be skipped there.
+            if symbol["st_info"]["type"] == "STT_SECTION":
+                continue
             section_index = symbol["st_shndx"]
             if (
                 not isinstance(section_index, int)
