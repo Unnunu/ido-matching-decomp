@@ -175,6 +175,22 @@ def load_report(path: Path) -> dict:
         return json.load(f)
 
 
+def load_symbol_mappings() -> dict[str, dict[str, str]]:
+    path = ROOT / "objdiff.json"
+    if not path.is_file():
+        return {}
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            config = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return {
+        unit.get("name", ""): unit.get("symbol_mappings", {})
+        for unit in config.get("units", [])
+        if unit.get("name")
+    }
+
+
 def read_target_functions(path: Path) -> list[dict]:
     """Return executable symbols from a target object.
 
@@ -611,6 +627,7 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict, list[str]]:
         }
 
     report_units = report.get("units", [])
+    symbol_mappings = load_symbol_mappings()
     for unit in report_units:
         name = unit.get("name", "")
         metadata = unit.get("metadata", {})
@@ -740,11 +757,13 @@ def compute(report: dict, asm_build_root: Path) -> tuple[dict, dict, list[str]]:
                     has_source,
                     action,
                 )
+                mapped_base_name = symbol_mappings.get(name, {}).get(result["name"])
                 if (
                     result["matched"]
                     and has_source
                     and base_function_names is not None
                     and result["name"] not in base_function_names
+                    and mapped_base_name not in base_function_names
                 ):
                     result["matched"] = False
                     result["reason"] = "no-base"

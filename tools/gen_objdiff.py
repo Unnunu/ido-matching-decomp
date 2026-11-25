@@ -24,6 +24,7 @@ from library import (
     library_category_name,
     library_source_path,
 )
+from mdebug import repair_mdebug
 from symbolize_base import symbolize_base
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -375,6 +376,13 @@ def generate(versions: list[str], include_missing_base: bool) -> tuple[dict, int
                 library_base = library_base_path(version, library, module)
                 if library_base is None:
                     continue
+                try:
+                    repair_mdebug(library_base, target)
+                except Exception as exc:
+                    print(
+                        f"warning: could not repair debug info for {library_base}: {exc}",
+                        file=sys.stderr,
+                    )
 
                 category_id = library_category_id(version, library)
                 categories.setdefault(

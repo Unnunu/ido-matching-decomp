@@ -16,13 +16,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+from mdebug import repair_mdebug
 from symbolize_base import symbolize_base
 
 ROOT = Path(__file__).resolve().parent.parent
 VERSION_RE = re.compile(r"(?:^|/)build/(?:src|asm)/(5\.3|7\.1)/")
 
 
-def target_for_base(base: Path) -> Path | None:
+def target_for_base(base: Path, allow_library: bool = False) -> Path | None:
     try:
         rel = base.relative_to(ROOT).as_posix()
     except ValueError:
@@ -37,7 +38,7 @@ def target_for_base(base: Path) -> Path | None:
         for unit in config.get("units", []):
             if unit.get("base_path") != rel:
                 continue
-            if unit.get("metadata", {}).get("library"):
+            if unit.get("metadata", {}).get("library") and not allow_library:
                 continue
             target = ROOT / unit.get("target_path", "")
             if target.is_file():
@@ -59,13 +60,19 @@ def symbolize_built_base(path: str) -> None:
         return
 
     target = target_for_base(base)
-    if target is None:
+    if target is not None:
+        try:
+            symbolize_base(target, base)
+        except Exception as exc:  # keep objdiff usable if symbol mirroring fails
+            print(f"warning: could not symbolize {base}: {exc}", file=sys.stderr)
         return
 
-    try:
-        symbolize_base(target, base)
-    except Exception as exc:  # keep objdiff usable if symbol mirroring fails
-        print(f"warning: could not symbolize {base}: {exc}", file=sys.stderr)
+    library_target = target_for_base(base, allow_library=True)
+    if library_target is not None:
+        try:
+            repair_mdebug(base, library_target)
+        except Exception as exc:
+            print(f"warning: could not repair {base}: {exc}", file=sys.stderr)
 
 
 def main(argv: list[str]) -> int:

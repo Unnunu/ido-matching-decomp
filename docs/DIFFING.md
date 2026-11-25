@@ -138,9 +138,49 @@ global `__Release_ID` in the target and only an anonymous `.rodata` section in
 the base. Without the name objdiff drops the whole data section from the report
 even when all 96 bytes are identical. It does not modify section contents or
 relocations. `tools/gen_objdiff.py` runs it for regular units, and
-`tools/objdiff_make.py` runs it after GUI-triggered rebuilds, so the base side
-shows the same `RO_STR_...` names as the target. Library units are left
-unchanged because their base object may be shared by several targets.
+`tools/objdiff_make.py` runs it after GUI-triggered rebuilds. Library units get
+only the `.mdebug` repair, because their base object may be shared by several
+targets.
+
+## Source names from .mdebug
+
+IDO records names for local source symbols in `.mdebug` even when it omits them
+from `.symtab`. `tools/mdebug.py` reads procedure names (`ST_PROC` /
+`ST_STATICPROC`) and local data names (`ST_STATIC` / `ST_GLOBAL` / `ST_CONST`).
+`tools/symbolize_base.py` prefers these names for local functions and
+`.data`/`.rodata` objects instead of the target's `func_...` / `D_...` names.
+Public functions and globals already carry their source names in `.symtab`.
+
+When a source name replaces a mirrored target name, `tools/gen_objdiff.py`
+emits a `target -> source` symbol mapping, so objdiff still pairs the function
+while the right column shows the C/Pascal name. Duplicate or conflicting
+source names fall back to the target name. String literals, jump tables and
+compiler-generated BSS labels have no source identifier, so they keep names
+such as `RO_STR_...`, `jtbl_...` and `B_...`. `tools/progress.py` consults
+`objdiff.json` mappings when checking that a matched function has a base
+symbol.
+
+## Source line numbers
+
+IDO includes line info in `.mdebug` by default; `-g` is not required. Enabling
+`-g` or `-g3` changes code generation and breaks matching. Two issues prevented
+objdiff 3.8.3 from using the existing line info:
+
+- `objcopy --add-symbol` moves `.mdebug` but leaves the header offsets pointing
+  at the old file positions.
+- objdiff assumes `ST_END.value` is an absolute end address, while IDO stores
+  the function size.
+
+`tools/mdebug.py` repairs both before objdiff reads the object: it normalizes
+the header offsets to section-relative values and rewrites `ST_END.value` to
+`start + size`. The operation is idempotent and changes only debug metadata.
+It is run for regular units through `symbolize_base.py`, for library units in
+`gen_objdiff.py`, and after GUI rebuilds in `objdiff_make.py`. objdiff then
+shows source line numbers automatically; no extra configuration is needed and
+objdiff itself is not patched. Target assembly objects have no source line
+info, so lines appear on the base side only.
+
+## BSS labels
 
 BSS labels get the same treatment. spimdisasm names target BSS ranges `B_...`
 but emits them as size-0 local `STT_NOTYPE` labels, while the compiler often
@@ -164,6 +204,8 @@ the mirrored label lands at the wrong base offset and objdiff still compares
 even when the two sections use different offsets. This makes correct BSS
 references match 100% while a reference to a different BSS offset still
 differs. BSS is not counted in `PROGRESS.md`.
+
+## Symbol types and section sizing
 
 The fake section symbol that objdiff adds for "all data in this section" uses
 `STT_OBJECT` symbols to infer its size. The `nonmatching` macro therefore emits

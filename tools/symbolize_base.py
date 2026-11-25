@@ -35,10 +35,13 @@ import struct
 import subprocess
 import sys
 import tempfile
+from collections import defaultdict
 from dataclasses import dataclass, replace
 from pathlib import Path
 
 from elftools.elf.elffile import ELFFile
+
+from mdebug import SourceNames, read_source_names, repair_mdebug
 
 SYMBOL_TYPES = ("STT_FUNC", "STT_OBJECT", "STT_NOTYPE")
 
@@ -355,7 +358,44 @@ def section_info(path: Path) -> dict[str, tuple[int, bool]]:
         }
 
 
-def missing_symbols(target: Path, base: Path) -> tuple[list[Symbol], set[str]]:
+def source_aliases(
+    target_symbols: list[Symbol], base: Path, source_names: SourceNames
+) -> dict[str, str]:
+    base_symbols = read_symbols(base)
+    base_by_name = {symbol.name: symbol for symbol in base_symbols}
+    base_names = symbol_names(base)
+    target_names = {symbol.name for symbol in target_symbols}
+    candidates: dict[str, str] = {}
+    counts: dict[str, int] = defaultdict(int)
+
+    for symbol in target_symbols:
+        if symbol.bind != "STB_LOCAL":
+            continue
+        source_name = source_names.name_for(symbol.section, symbol.value)
+        if not source_name or source_name == symbol.name or source_name.startswith("$"):
+            continue
+        existing = base_by_name.get(source_name)
+        if existing is not None:
+            if existing.section != symbol.section or existing.value != symbol.value:
+                continue
+        elif source_name in base_names:
+            continue
+        if source_name in target_names and source_name != symbol.name:
+            continue
+        candidates[symbol.name] = source_name
+        counts[source_name] += 1
+
+    return {
+        target_name: source_name
+        for target_name, source_name in candidates.items()
+        if counts[source_name] == 1
+    }
+
+
+def missing_symbols(
+    target: Path, base: Path, source_names: SourceNames | None = None
+) -> tuple[list[Symbol], set[str]]:
+    source_names = source_names or SourceNames()
     definitions = bss_label_definitions(target)
     target_symbols = read_symbols(target)
     by_name = {symbol.name: symbol for symbol in target_symbols}
@@ -372,6 +412,7 @@ def missing_symbols(target: Path, base: Path) -> tuple[list[Symbol], set[str]]:
     base_bss_offsets = bss_offsets(base)
     deltas = bss_deltas(target, base, definitions)
     base_sections = section_info(base)
+    aliases = source_aliases(target_symbols, base, source_names)
 
     additions: list[Symbol] = []
     stale: set[str] = set()
@@ -418,6 +459,27 @@ def missing_symbols(target: Path, base: Path) -> tuple[list[Symbol], set[str]]:
             additions.append(replace(symbol, value=value))
             continue
         if symbol.value > section_size or symbol.size > section_size - symbol.value:
+            continue
+        desired_name = aliases.get(symbol.name, symbol.name)
+        if desired_name != symbol.name:
+            existing = base_by_name.get(symbol.name)
+            if (
+                existing is not None
+                and existing.bind == "STB_LOCAL"
+                and symbol.name not in aliases.values()
+            ):
+                stale.add(symbol.name)
+            existing_source = base_by_name.get(desired_name)
+            if existing_source is not None:
+                if (
+                    existing_source.section == symbol.section
+                    and existing_source.value == symbol.value
+                ):
+                    continue
+                continue
+            if desired_name in base_names:
+                continue
+            additions.append(replace(symbol, name=desired_name))
             continue
         if (symbol.section, symbol.value, symbol.size) in base_keys:
             continue
@@ -496,7 +558,9 @@ def symbolize_base(target: Path, base: Path) -> int:
     if not target.is_file() or not base.is_file():
         return 0
 
-    additions, stale = missing_symbols(target, base)
+    repair_mdebug(base, target)
+    source_names = read_source_names(base)
+    additions, stale = missing_symbols(target, base, source_names)
     if not additions and not stale:
         return 0
 
@@ -519,6 +583,7 @@ def symbolize_base(target: Path, base: Path) -> int:
         subprocess.run(command, check=True)
         patch_symbol_metadata(temp, additions)
         os.replace(temp, base)
+        repair_mdebug(base, target)
     finally:
         temp.unlink(missing_ok=True)
 
