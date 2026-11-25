@@ -72,12 +72,6 @@ def parse_args() -> argparse.Namespace:
         help="tracked progress table (default: PROGRESS.md)",
     )
     parser.add_argument(
-        "--baseline",
-        type=Path,
-        default=ROOT / "build/baseline.json",
-        help="progress baseline (default: build/baseline.json)",
-    )
-    parser.add_argument(
         "--asm-root",
         type=Path,
         default=ROOT / "asm",
@@ -103,7 +97,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--check",
         action="store_true",
-        help="verify PROGRESS.md, asm-marked and baseline without writing",
+        help="verify PROGRESS.md and asm-marked without writing",
     )
     parser.add_argument(
         "--print",
@@ -125,16 +119,6 @@ def parse_args() -> argparse.Namespace:
         "--no-markdown",
         action="store_true",
         help="do not write PROGRESS.md",
-    )
-    parser.add_argument(
-        "--init-baseline",
-        action="store_true",
-        help="create build/baseline.json when it does not exist",
-    )
-    parser.add_argument(
-        "--write-baseline",
-        action="store_true",
-        help="overwrite build/baseline.json with the current results",
     )
     parser.add_argument(
         "--quiet",
@@ -1277,85 +1261,6 @@ def build_marked(
     return cache, errors
 
 
-def baseline_measures(value: dict) -> dict:
-    return {
-        "functions": value["functions"],
-        "matched_functions": value["matched_functions"],
-        "code": value["code"],
-        "matched_code": value["matched_code"],
-        "sections": {
-            section_name: {
-                "total": value["sections"][section_name]["total"],
-                "matched": value["sections"][section_name]["matched"],
-            }
-            for section_name in DATA_SECTIONS
-        },
-    }
-
-
-def baseline_from_result(result: dict) -> dict:
-    return {
-        "schema_version": SCHEMA_VERSION,
-        "versions": {
-            key: baseline_measures(value)
-            for key, value in sorted(result["versions"].items())
-        },
-        "programs": {
-            key: baseline_measures(value)
-            for key, value in sorted(result["programs"].items())
-        },
-        "libraries": {
-            key: baseline_measures(value)
-            for key, value in sorted(result.get("libraries", {}).items())
-        },
-        "totals": baseline_measures(result["totals"]),
-    }
-
-
-def compare_baseline(result: dict, baseline: dict) -> list[str]:
-    failures: list[str] = []
-    current = baseline_from_result(result)
-
-    for scope in ("programs", "libraries", "versions", "totals"):
-        old_scope = baseline.get(scope, {})
-        new_scope = current[scope]
-        if scope == "totals":
-            old_items = {"totals": old_scope}
-            new_items = {"totals": new_scope}
-        else:
-            old_items = old_scope
-            new_items = new_scope
-
-        for key, new in new_items.items():
-            old = old_items.get(key)
-            if old is None:
-                continue
-            if new["matched_functions"] < old["matched_functions"]:
-                failures.append(
-                    f"{scope}:{key}: matched functions decreased "
-                    f"{old['matched_functions']} -> {new['matched_functions']}"
-                )
-            if new["matched_code"] < old["matched_code"]:
-                failures.append(
-                    f"{scope}:{key}: matched code decreased "
-                    f"{old['matched_code']} -> {new['matched_code']}"
-                )
-            old_sections = old.get("sections", {})
-            new_sections = new.get("sections", {})
-            for section_name in DATA_SECTIONS:
-                old_section = old_sections.get(section_name)
-                new_section = new_sections.get(section_name)
-                if old_section is None or new_section is None:
-                    continue
-                if new_section["matched"] < old_section["matched"]:
-                    failures.append(
-                        f"{scope}:{key}: {section_name} matched bytes decreased "
-                        f"{old_section['matched']} -> {new_section['matched']}"
-                    )
-
-    return failures
-
-
 def main() -> int:
     args = parse_args()
 
@@ -1409,10 +1314,6 @@ def main() -> int:
         else:
             markdown_changed = write_if_changed(args.markdown, markdown)
 
-        if args.write_baseline or (args.init_baseline and not args.baseline.is_file()):
-            baseline = baseline_from_result(result)
-            write_if_changed(args.baseline, json.dumps(baseline, indent=2) + "\n")
-
         if not args.quiet:
             totals = result["totals"]
             print(
@@ -1438,19 +1339,6 @@ def main() -> int:
         actual_markdown = args.markdown.read_text(encoding="utf-8")
         if actual_markdown != markdown:
             failures.append(f"{args.markdown}: stale (run make match)")
-
-    if not args.baseline.is_file():
-        failures.append(
-            f"{args.baseline}: missing (run make match once to initialize it)"
-        )
-    else:
-        try:
-            with args.baseline.open("r", encoding="utf-8") as f:
-                baseline = json.load(f)
-        except (OSError, json.JSONDecodeError) as exc:
-            failures.append(f"{args.baseline}: cannot read baseline: {exc}")
-        else:
-            failures.extend(compare_baseline(result, baseline))
 
     if failures:
         for failure in failures:

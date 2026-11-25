@@ -274,8 +274,7 @@ objdiff-cli report generate -p . -o build/report.json
 ```bash
 make match      # incremental update; writes PROGRESS.md and build/progress.json
 make progress   # full pass, prints the table
-make check      # fail on stale PROGRESS.md or a regression vs build/baseline.json
-make baseline   # explicitly refresh the regression baseline
+make check      # fail when PROGRESS.md or build/asm-marked is stale
 ```
 
 `tools/progress.py` derives matched functions from the report. Target objects
@@ -296,8 +295,8 @@ the program. `pad_*` target objects that contain only padding are ignored;
 `pad_*` objects that contain a library function stay in the library bucket.
 Data-only library units also contribute their `.data`/`.rodata` sections to the
 library rows even though they have no functions; they are never added to a
-program. Library rows are included in version subtotals, the all-versions total
-and the regression baseline.
+program. Library rows are included in version subtotals and the all-versions
+total.
 
 The table also reports `.data` and `.rodata` byte match percentages. They use
 objdiff section match percentages; target-only units contribute their full
