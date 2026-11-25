@@ -941,7 +941,7 @@ static int scan_wchar(void) {
     return CONSTANT;
 }
 
-void func_004141BC(void) {
+static void func_004141BC(void) {
 }
 
 static int scan_identifier(char firstChar) {

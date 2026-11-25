@@ -320,7 +320,20 @@ def missing_symbols(target: Path, base: Path) -> tuple[list[Symbol], set[str]]:
         if (symbol.section, symbol.value, symbol.size) in base_keys:
             continue
         if symbol.name in base_names:
-            continue
+            # A forward-declared static function can leave only an undefined
+            # entry with the same name in the base .symtab.  Keep the target's
+            # defined local symbol and replace the unusable undefined entry,
+            # otherwise objdiff cannot pair the function and progress reports
+            # no-base.  Restrict this to local executable symbols so external
+            # data references are left alone.
+            if (
+                symbol.bind == "STB_LOCAL"
+                and executable
+                and base_by_name.get(symbol.name) is None
+            ):
+                stale.add(symbol.name)
+            else:
+                continue
         additions.append(symbol)
     return additions, stale
 
