@@ -6,10 +6,10 @@ only when objdiff reports a 100% fuzzy match and a real base symbol or target
 to base mapping exists.  Target objects without a base object are still counted
 as unmatched so unstarted source files stay in the denominator.
 
-Library code is classified by address ranges from
-``symbols/<version>/libraries.csv``.  Every copy of a library function in every
-program binary is counted separately, including static functions.  Data
-sections are assigned to a library only when a range covers the whole split
+Library code is classified by ``library/member`` names in
+``symbols/<version>/<program>.splits.csv``.  Every copy of a library function in
+every program binary is counted separately, including static functions.  Data
+sections are assigned to a library only when a split row covers the whole split
 section interval.
 """
 
@@ -711,7 +711,7 @@ def render_markdown(result: dict) -> str:
     lines.append(
         "Library rows are statically linked library code found in target "
         "objects. They are counted separately from the program that embeds "
-        "them; see `symbols/<version>/libraries.csv`."
+        "them; library splits are named `library/member`."
     )
     lines.append("")
     return "\n".join(lines)

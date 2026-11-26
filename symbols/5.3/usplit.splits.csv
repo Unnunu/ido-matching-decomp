@@ -23,17 +23,25 @@ offset,vram,.dummy
 00DB20,0040DB20,init
 
 offset,vram,.data
-00E000,10000000,usplit_00E000
+00E000,10000000,libmld/stcu
+00E010,10000010,libmld/stio
+00E040,10000040,libmld/stfd
+00E100,10000100,libmld/md_stfd
+00E1B0,100001B0,libmld/stfe
+00E1C0,100001C0,libmld/md_mldfunc
 
 offset,vram,.rodata
 00E230,10000230,usplit_00E230
-00E650,10000650,usplit_00E650
-00EA80,10000A80,usplit_00EA80
-00EAD0,10000AD0,usplit_00EAD0
-00EB60,10000B60,usplit_00EB60
-00EBF0,10000BF0,usplit_00EBF0
-00ECE0,10000CE0,usplit_00ECE0
-00EDF0,10000DF0,usplit_00EDF0
+00E400,10000400,libmld/stcu
+00E650,10000650,libmld/stio
+00E810,10000810,libmld/stfd
+00EA80,10000A80,libmld/swap
+00EAD0,10000AD0,libmld/md_stfd
+00EB60,10000B60,libmld/stfe
+00EBF0,10000BF0,libmld/md_mldfunc
+00ECE0,10000CE0,libmld/md_stcu
+00EDF0,10000DF0,libmld/staux
+00EE50,10000E50,usplit_00EDF0
 
 offset,vram,.dummy
 00EEA0,10000EA0,got

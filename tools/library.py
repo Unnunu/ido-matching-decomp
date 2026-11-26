@@ -1,24 +1,16 @@
 """Library membership by target address range.
 
-Statically linked library code is part of the program binaries.  Library
-membership is tracked as address ranges in ``symbols/<version>/libraries.csv``::
+Statically linked library code is part of the program binaries.  Membership is
+encoded in the split names themselves: a row named ``library/member`` (for
+example ``libu/uini`` in ``symbols/<version>/ugen.splits.csv``) is library
+code, while a plain name is program code.  The matching base object is selected
+from ``build/src/<version>/<libu>/<uini>.o``.
 
-    # binary_name,start_addr,end_addr,libname
-    ugen,0x0044F430,0x004551F0,libu/uini
-
-``binary_name`` is the program binary (``ugen``, ``as1``, ...).  Addresses are
-virtual addresses in that binary; hexadecimal without ``0x`` is also accepted,
-matching the split CSVs.  ``libname`` is ``library/module`` so the matching
-base object can be selected (``build/src/<version>/<libu>/<uini>.o``).  A plain
-``libname`` without ``/`` uses the same value as the module.
-
-The section (``.text``, ``.data`` or ``.rodata``) is not stored: a range is
-matched against the split section intervals reconstructed from
-``symbols/<version>/<program>.splits.csv`` and the target object section sizes.
-``.text`` ranges may start and end at function boundaries inside a split;
-``.data``/``.rodata`` ranges must cover a complete target section interval
-because matching is section based.  Invalid or stale rows are ignored; this
-file is maintained by hand and is not validated.
+Ranges are reconstructed from ``symbols/<version>/<program>.splits.csv``: the
+end of a row is the start of the next row (which may be in the following
+section).  ``.text`` ranges may start and end at function boundaries inside a
+split; ``.data``/``.rodata`` ranges cover a complete target section interval
+because matching is section based.
 
 Only libu/libp/libmld have source and built base objects today.  Other library
 categories are still counted, but as unmatched until a base object exists.
@@ -85,32 +77,16 @@ class LibraryRanges:
         self._load()
 
     def _load(self) -> None:
-        path = self.root / "symbols" / self.version / "libraries.csv"
-        if not path.is_file():
-            return
-
-        for raw_line in path.read_text(encoding="utf-8").splitlines():
-            line = raw_line.split("#", 1)[0].strip()
-            if not line:
+        for (program, _section, name), (start, end) in split_intervals(
+            self.version, self.root
+        ).items():
+            if "/" not in name:
                 continue
-            parts = [part.strip() for part in line.split(",")]
-            if len(parts) < 4:
-                continue
-            binary, start_text, end_text, category_text = parts[:4]
-            if not binary:
-                continue
-            category = parse_category(category_text)
+            category = parse_category(name)
             if category is None:
                 continue
-            try:
-                start = parse_address(start_text)
-                end = parse_address(end_text)
-            except ValueError:
-                continue
-            if end <= start:
-                continue
             self.ranges.append(
-                LibraryRange(binary, start, end, category[0], category[1])
+                LibraryRange(program, start, end, category[0], category[1])
             )
         self.ranges.sort(key=lambda item: (item.binary, item.start, item.end))
 

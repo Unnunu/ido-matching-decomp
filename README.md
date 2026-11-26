@@ -233,8 +233,8 @@ in [PROGRESS.md](PROGRESS.md).
 - `asm/<version>/<program>/` - generated disassembly, ignored by git.
 - `build/` - compiled base objects, assembled target objects, reports and
   progress data, ignored by git.
-- `symbols/<version>/` - tracked split definitions (`*.splits.csv`), library
-  membership (`libraries.csv`) and optional `*.match_overrides.txt`.
+- `symbols/<version>/` - tracked split definitions (`*.splits.csv`, library
+  members named `library/member`) and optional `*.match_overrides.txt`.
 - `context/` - generated spimdisasm context CSVs, ignored by git.
 - `include/` - project headers, including IRIX/IDO headers under `include/indy/`.
 - `ido/` - original IDO binaries used for disassembly.

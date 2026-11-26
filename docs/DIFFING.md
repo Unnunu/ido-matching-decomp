@@ -51,39 +51,36 @@ IDO binaries statically link libraries such as `libu`, `libp`, `libmld`,
 `libelf` and the Pascal runtime. Their functions are part of target objects but
 are not program code, so they must not inflate a program's unstarted count.
 
-Library membership lives in `symbols/<version>/libraries.csv`:
+Library membership is encoded in the split names themselves. A row named
+`library/member` is library code, while a plain name is program code:
 
 ```text
-# kind,program,target,library,module
-unit,ugen,ugen_04F430,libu,uini
-function,ugen,uputinit,libu,ucio
+offset,vram,.text
+067250,00467250,libu/ucio
 ```
 
-- `kind=unit` marks every function in `<program>/<target>` as library code.
-- `kind=function` marks one function name in that program.
-- Function rows override unit rows; anything unlisted stays program code.
-- The split CSVs are not extended because they describe object boundaries and
-  are consumed by spimdisasm. A split object can mix program and library code,
-  so membership has to be tracked per function as well as per object.
-- A `kind=unit` row also works for a data-only split (a target object with no
-  functions). Its `.data`/`.rodata` sections are then counted in the library
-  bucket instead of the program bucket. Pure-library data-only splits are
-  identified by cross-references: every external reference to their symbols
-  comes from library functions. Data-only splits that mix program and library
-  data are left as program code until section-level annotations exist.
+- The split CSVs are the single source of truth; there is no separate
+  `libraries.csv`.
+- `.text`, `.data` and `.rodata` rows all use the same `library/member` form.
+  Gaps between library members are named `pad_<address>` and stay program code.
+- A data-only library member has only `.data`/`.rodata` rows, with no `.text`
+  row. Ownership comes from target symbols and references from the generated
+  assembly, not from archive sizes.
+- Names without `/` keep their program meaning. Continuations of a repeated
+  program name get a `_2`, `_3`, ... suffix.
 
 `tools/gen_objdiff.py` emits extra library units for categories with a built
 base object (`libu`, `libp`, `libmld`; `libmld` uses the `mld` source/build
 folder for `sex.c`):
 
 ```text
-7.1/libu/uini/ugen/ugen_04F430
-target_path = build/asm/7.1/ugen/ugen_04F430.o
+7.1/ugen/libu/uini
+target_path = build/asm/7.1/ugen/libu/uini.o
 base_path   = build/src/7.1/libu/uini.o
 metadata.library_name = libu
 metadata.library_module = uini
 metadata.target_program = ugen
-metadata.target_rel = ugen_04F430
+metadata.target_rel = libu/uini
 ```
 
 These units exist for diffing and for objdiff fuzzy results. Progress skips
