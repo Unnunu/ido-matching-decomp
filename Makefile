@@ -155,16 +155,11 @@ DEP_FILES := $(O_FILES:.o=.d)
 PYTHON_PROGRESS := $(PYTHON) tools/progress.py
 OBJDIFF_REPORT := $(OBJDIFF_CLI) report generate -p . -o $(BUILD)/report.json
 
-.PHONY: all build check both clean distclean setup uv-sync yacc disasm \
-	disasm-all objdiff report diff match progress
+.PHONY: all build both clean distclean setup uv-sync yacc disasm \
+	disasm-all objdiff report diff progress
 .DEFAULT_GOAL := all
 
 all: build
-	@if [ -f $(BUILD)/report.json ] && [ -f objdiff.json ] \
-		&& command -v "$(OBJDIFF_CLI)" >/dev/null 2>&1; then \
-		$(OBJDIFF_REPORT) >/dev/null 2>&1 && \
-		$(PYTHON_PROGRESS) --write --incremental --no-markdown --quiet; \
-	fi
 
 build: $(O_FILES)
 
@@ -187,14 +182,8 @@ objdiff: build
 report: objdiff
 	$(OBJDIFF_REPORT)
 
-check: report
-	$(PYTHON_PROGRESS) --check --full
-
-match: report
-	$(PYTHON_PROGRESS) --write --incremental
-
 progress: report
-	$(PYTHON_PROGRESS) --write --full --print
+	$(PYTHON_PROGRESS)
 
 diff: objdiff
 	@if [ -z "$(UNIT)" ]; then \

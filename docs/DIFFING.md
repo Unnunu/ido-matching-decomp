@@ -272,9 +272,7 @@ objdiff-cli report generate -p . -o build/report.json
 ## Progress
 
 ```bash
-make match      # incremental update; writes PROGRESS.md and build/progress.json
-make progress   # full pass, prints the table
-make check      # fail when PROGRESS.md or build/asm-marked is stale
+make progress   # regenerates PROGRESS.md
 ```
 
 `tools/progress.py` derives matched functions from the report. Target objects
@@ -302,6 +300,5 @@ The table also reports `.data` and `.rodata` byte match percentages. They use
 objdiff section match percentages; target-only units contribute their full
 section size to the denominator. `.bss` is intentionally not counted yet.
 
-The generated NON_MATCHING view lives in `build/asm-marked/<version>/<program>/`.
-It is produced from `asm/` without rewriting it. `make match` reuses an mtime
-cache stored in `build/progress.json`, so unchanged units are not rewritten.
+`make progress` is safe to re-run: `PROGRESS.md` is only rewritten when its
+content changes.
