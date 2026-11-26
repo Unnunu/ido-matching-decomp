@@ -18,13 +18,17 @@ from pathlib import Path
 from elftools.elf.elffile import ELFFile
 
 from library import (
-    LibraryCatalog,
+    DATA_SECTIONS,
+    LibraryRanges,
+    function_address,
     library_base_path,
     library_category_id,
     library_category_name,
     library_source_path,
+    section_intervals,
+    section_starts,
+    split_intervals,
 )
-from mdebug import repair_mdebug
 from symbolize_base import symbolize_base
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -167,12 +171,14 @@ def read_symbols(path: Path) -> list[tuple[str, int, int, str]]:
         return result
 
 
-def target_function_names(path: Path) -> set[str]:
-    names: set[str] = set()
-    for section, _value, _size, name in read_symbols(path):
-        if section == ".text":
-            names.add(name)
-    return names
+def section_sizes(path: Path) -> dict[str, int]:
+    with path.open("rb") as f:
+        elf = ELFFile(f)
+        return {
+            section.name: int(section["sh_size"])
+            for section in elf.iter_sections()
+            if section.name in (".text", *DATA_SECTIONS)
+        }
 
 
 MISALIGNED_MIN_COMMON = 8
@@ -296,10 +302,10 @@ def generate(versions: list[str], include_missing_base: bool) -> tuple[dict, int
     mapping_count = 0
     skipped_units = 0
 
-    catalogs = {version: LibraryCatalog(version) for version in versions}
-
     for version in versions:
-        catalog = catalogs[version]
+        ranges = LibraryRanges(version)
+        starts = section_starts(version)
+        splits = split_intervals(version)
         for program, rel, target in target_objects(version):
             source = resolve_source(version, program, rel)
             base: Path | None = None
@@ -310,25 +316,56 @@ def generate(versions: list[str], include_missing_base: bool) -> tuple[dict, int
             if base is None:
                 base = base_for_target(version, program, rel)
 
-            target_names = target_function_names(target)
-            unit_library = catalog.unit_category(program, rel)
-            function_libraries = {
-                name: catalog.category_for(program, rel, name)
-                for name in target_names
-            }
+            target_symbols = read_symbols(target)
+            target_functions = [
+                (value, size, name)
+                for section, value, size, name in target_symbols
+                if section == ".text"
+            ]
+            intervals = section_intervals(
+                starts,
+                program,
+                rel,
+                {name: {"size": size} for name, size in section_sizes(target).items()},
+                splits,
+            )
+            function_categories: dict[str, tuple[str, str] | None] = {}
+            for value, _size, name in target_functions:
+                address = function_address(
+                    starts, program, rel, ".text", value
+                )
+                match = (
+                    ranges.find(program, address)
+                    if address is not None
+                    else None
+                )
+                function_categories[name] = (
+                    match.category if match is not None else None
+                )
+
+            data_categories: dict[str, tuple[str, str]] = {}
+            for section in DATA_SECTIONS:
+                interval = intervals.get(section)
+                if interval is None:
+                    continue
+                match = ranges.find_section(program, interval[0], interval[1])
+                if match is not None:
+                    data_categories[section] = match.category
+
             library_categories = {
                 category
-                for category in function_libraries.values()
+                for category in function_categories.values()
                 if category is not None
             }
-            if unit_library is not None:
-                library_categories.add(unit_library)
-            whole_library = unit_library is not None or (
-                bool(target_names)
-                and all(function_libraries[name] is not None for name in target_names)
+            library_categories.update(data_categories.values())
+
+            has_program = any(
+                category is None for category in function_categories.values()
+            ) or any(
+                section not in data_categories for section in intervals
             )
 
-            if not whole_library:
+            if has_program:
                 if base is None and not include_missing_base:
                     skipped_units += 1
                 else:
@@ -377,10 +414,10 @@ def generate(versions: list[str], include_missing_base: bool) -> tuple[dict, int
                 if library_base is None:
                     continue
                 try:
-                    repair_mdebug(library_base, target)
+                    symbolize_base(target, library_base)
                 except Exception as exc:
                     print(
-                        f"warning: could not repair debug info for {library_base}: {exc}",
+                        f"warning: could not symbolize {library_base}: {exc}",
                         file=sys.stderr,
                     )
 
