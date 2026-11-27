@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Generate objdiff.json for the IDO matching decomp project.
 
+Target objects are listed from the disassembly tree, not from ``build/asm``:
+stale objects from older splits must not become units.  A unit is emitted only
+when the target object and a C/Pascal source both exist.
+
 objdiff symbol_mappings are directional: the key is the target symbol name and
 the value is the base symbol name (target -> base). This was verified with
 7.1/ugen/reg_mgr (add_restricted_reg -> restricted_reg).
@@ -18,26 +22,22 @@ from pathlib import Path
 from elftools.elf.elffile import ELFFile
 
 from library import (
-    DATA_SECTIONS,
-    LibraryRanges,
-    function_address,
     library_base_path,
     library_category_id,
     library_category_name,
     library_source_path,
-    section_intervals,
-    section_starts,
-    split_intervals,
 )
 from symbolize_base import symbolize_base
 
 ROOT = Path(__file__).resolve().parent.parent
 BUILD = ROOT / "build"
+ASM = ROOT / "asm"
 SRC = ROOT / "src"
 SYMBOLS = ROOT / "symbols"
 
 VERSIONS = ("5.3", "7.1")
 SOURCE_EXTS = (".c", ".p")
+TARGET_SUFFIXES = (".text.s", ".data.s", ".rodata.s", ".bss.s")
 MIN_VERSION = "3.8.3"
 
 # objdiff GUI rebuilds the base object on save and via the Build button. The
@@ -51,7 +51,6 @@ CUSTOM_ARGS = ["run", "python", "tools/objdiff_make.py"]
 # Explicit target -> source aliases where the split name differs from the
 # source basename.
 SOURCE_ALIASES = {
-    ("7.1", "cc", "mld"): "src/mld/sex.c",
     ("7.1", "cc", "release_id"): "src/releaseid.c",
 }
 
@@ -79,17 +78,43 @@ def parse_args() -> argparse.Namespace:
 
 
 def target_objects(version: str) -> list[tuple[str, str, Path]]:
-    version_dir = BUILD / "asm" / version
+    """Return target objects derived from the disassembly tree."""
+
+    version_dir = ASM / version
     if not version_dir.is_dir():
         return []
 
     units: list[tuple[str, str, Path]] = []
     for program_dir in sorted(p for p in version_dir.iterdir() if p.is_dir()):
         program = program_dir.name
-        for target in sorted(program_dir.rglob("*.o")):
-            rel = target.relative_to(program_dir).with_suffix("").as_posix()
-            units.append((program, rel, target))
+        rels: set[str] = set()
+        for source in sorted(program_dir.rglob("*.s")):
+            relative = source.relative_to(program_dir).as_posix()
+            for suffix in TARGET_SUFFIXES:
+                if relative.endswith(suffix):
+                    rels.add(relative[: -len(suffix)])
+                    break
+
+        for rel in sorted(rels):
+            target = BUILD / "asm" / version / program / f"{rel}.o"
+            if target.is_file():
+                units.append((program, rel, target))
     return units
+
+
+def is_anonymous_split(program: str, rel: str) -> bool:
+    name = Path(rel).name
+    return (
+        re.fullmatch(
+            rf"{re.escape(program)}_[0-9A-Fa-f]{{6,8}}(?:_[0-9]+)?", name
+        )
+        is not None
+    )
+
+
+def is_hidden_program_target(program: str, rel: str) -> bool:
+    name = Path(rel).name
+    return name.startswith("pad_") or is_anonymous_split(program, rel)
 
 
 def resolve_source(version: str, program: str, rel: str) -> Path | None:
@@ -111,7 +136,7 @@ def resolve_source(version: str, program: str, rel: str) -> Path | None:
             if candidate.is_file():
                 return candidate
 
-    match = re.fullmatch(r"[A-Za-z0-9]+_([0-9A-Fa-f]{6})", basename)
+    match = re.fullmatch(r"[A-Za-z0-9]+_([0-9A-Fa-f]{6,8})", basename)
     if match is not None:
         vram = 0x400000 + int(match.group(1), 16)
         candidate = SRC / program / f"code_{vram:08X}.c"
@@ -129,16 +154,6 @@ def resolve_source(version: str, program: str, rel: str) -> Path | None:
 def base_for_source(version: str, source: Path) -> Path:
     rel = source.relative_to(SRC).with_suffix(".o")
     return BUILD / "src" / version / rel
-
-
-def base_for_target(version: str, program: str, rel: str) -> Path | None:
-    for candidate in (
-        BUILD / "src" / version / program / f"{rel}.o",
-        BUILD / "src" / version / f"{rel}.o",
-    ):
-        if candidate.is_file():
-            return candidate
-    return None
 
 
 def read_symbols(path: Path) -> list[tuple[str, int, int, str]]:
@@ -169,16 +184,6 @@ def read_symbols(path: Path) -> list[tuple[str, int, int, str]]:
                 continue
             result.append((section.name, symbol["st_value"], size, name))
         return result
-
-
-def section_sizes(path: Path) -> dict[str, int]:
-    with path.open("rb") as f:
-        elf = ELFFile(f)
-        return {
-            section.name: int(section["sh_size"])
-            for section in elf.iter_sections()
-            if section.name in (".text", *DATA_SECTIONS)
-        }
 
 
 MISALIGNED_MIN_COMMON = 8
@@ -295,6 +300,10 @@ def load_overrides(version: str, program: str) -> dict[str, str]:
     return overrides
 
 
+def add_category(categories: dict[str, dict[str, str]], category_id: str, name: str) -> None:
+    categories.setdefault(category_id, {"id": category_id, "name": name})
+
+
 def generate(versions: list[str], include_missing_base: bool) -> tuple[dict, int, int, int]:
     categories: dict[str, dict[str, str]] = {}
     units: list[dict] = []
@@ -303,159 +312,108 @@ def generate(versions: list[str], include_missing_base: bool) -> tuple[dict, int
     skipped_units = 0
 
     for version in versions:
-        ranges = LibraryRanges(version)
-        starts = section_starts(version)
-        splits = split_intervals(version)
         for program, rel, target in target_objects(version):
-            source = resolve_source(version, program, rel)
-            base: Path | None = None
-            if source is not None:
-                candidate = base_for_source(version, source)
-                if candidate.is_file():
-                    base = candidate
-            if base is None:
-                base = base_for_target(version, program, rel)
-
-            target_symbols = read_symbols(target)
-            target_functions = [
-                (value, size, name)
-                for section, value, size, name in target_symbols
-                if section == ".text"
-            ]
-            intervals = section_intervals(
-                starts,
-                program,
-                rel,
-                {name: {"size": size} for name, size in section_sizes(target).items()},
-                splits,
-            )
-            function_categories: dict[str, tuple[str, str] | None] = {}
-            for value, _size, name in target_functions:
-                address = function_address(
-                    starts, program, rel, ".text", value
-                )
-                match = (
-                    ranges.find(program, address)
-                    if address is not None
-                    else None
-                )
-                function_categories[name] = (
-                    match.category if match is not None else None
-                )
-
-            data_categories: dict[str, tuple[str, str]] = {}
-            for section in DATA_SECTIONS:
-                interval = intervals.get(section)
-                if interval is None:
+            if "/" in rel:
+                library, member = rel.split("/", 1)
+                source = library_source_path(version, library, member)
+                if source is None:
                     continue
-                match = ranges.find_section(program, interval[0], interval[1])
-                if match is not None:
-                    data_categories[section] = match.category
-
-            library_categories = {
-                category
-                for category in function_categories.values()
-                if category is not None
-            }
-            library_categories.update(data_categories.values())
-
-            has_program = any(
-                category is None for category in function_categories.values()
-            ) or any(
-                section not in data_categories for section in intervals
-            )
-
-            if has_program:
-                if base is None and not include_missing_base:
+                base = library_base_path(version, library, member)
+                if base is None:
                     skipped_units += 1
-                else:
-                    category_id = f"{version}/{program}"
-                    categories.setdefault(
-                        category_id,
-                        {"id": category_id, "name": f"{version} / {program}"},
-                    )
-
-                    complete = base is not None
-                    if complete:
-                        complete_units += 1
-
-                    metadata: dict = {
-                        "complete": complete,
-                        "auto_generated": source is None,
-                        "progress_categories": [category_id],
-                    }
-                    if source is not None:
-                        metadata["source_path"] = source.relative_to(ROOT).as_posix()
-
-                    unit: dict = {
-                        "name": f"{version}/{program}/{rel}",
-                        "target_path": target.relative_to(ROOT).as_posix(),
-                        "symbol_mappings": {},
-                        "metadata": metadata,
-                    }
-                    if base is not None:
-                        try:
-                            symbolize_base(target, base)
-                        except Exception as exc:
-                            print(
-                                f"warning: could not symbolize {base}: {exc}",
-                                file=sys.stderr,
-                            )
-                        unit["base_path"] = base.relative_to(ROOT).as_posix()
-                        unit["symbol_mappings"] = symbol_mappings(
-                            target, base, version, program
-                        )
-                        mapping_count += len(unit["symbol_mappings"])
-
-                    units.append(unit)
-
-            for library, module in sorted(library_categories):
-                library_base = library_base_path(version, library, module)
-                if library_base is None:
                     continue
+
                 try:
-                    symbolize_base(target, library_base)
+                    symbolize_base(target, base)
                 except Exception as exc:
                     print(
-                        f"warning: could not symbolize {library_base}: {exc}",
+                        f"warning: could not symbolize {base}: {exc}",
                         file=sys.stderr,
                     )
 
                 category_id = library_category_id(version, library)
-                categories.setdefault(
+                add_category(
+                    categories,
                     category_id,
-                    {
-                        "id": category_id,
-                        "name": library_category_name(version, library),
-                    },
+                    library_category_name(version, library),
                 )
 
                 complete_units += 1
-                library_source = library_source_path(version, library, module)
                 metadata = {
                     "complete": True,
                     "auto_generated": False,
                     "library": True,
                     "library_name": library,
-                    "library_module": module,
+                    "library_module": member,
                     "target_program": program,
                     "target_rel": rel,
                     "progress_categories": [category_id],
+                    "source_path": source.relative_to(ROOT).as_posix(),
                 }
-                if library_source is not None:
-                    metadata["source_path"] = library_source.relative_to(ROOT).as_posix()
+                mappings = symbol_mappings(target, base, version, program)
+                mapping_count += len(mappings)
+                units.append(
+                    {
+                        "name": f"{version}/{library}/{program}/{member}",
+                        "target_path": target.relative_to(ROOT).as_posix(),
+                        "base_path": base.relative_to(ROOT).as_posix(),
+                        "symbol_mappings": mappings,
+                        "metadata": metadata,
+                    }
+                )
+                continue
 
-                library_unit: dict = {
-                    "name": f"{version}/{library}/{module}/{program}/{rel}",
-                    "target_path": target.relative_to(ROOT).as_posix(),
-                    "base_path": library_base.relative_to(ROOT).as_posix(),
-                    "symbol_mappings": symbol_mappings(
-                        target, library_base, version, program
-                    ),
-                    "metadata": metadata,
-                }
-                mapping_count += len(library_unit["symbol_mappings"])
-                units.append(library_unit)
+            if is_hidden_program_target(program, rel):
+                continue
+
+            source = resolve_source(version, program, rel)
+            if source is None:
+                continue
+
+            base = base_for_source(version, source)
+            if not base.is_file():
+                base = None
+            if base is None and not include_missing_base:
+                skipped_units += 1
+                continue
+
+            category_id = f"{version}/{program}"
+            add_category(
+                categories,
+                category_id,
+                f"{version} / {program}",
+            )
+
+            metadata: dict = {
+                "complete": base is not None,
+                "auto_generated": source is None,
+                "progress_categories": [category_id],
+            }
+            if source is not None:
+                metadata["source_path"] = source.relative_to(ROOT).as_posix()
+
+            unit: dict = {
+                "name": f"{version}/{program}/{rel}",
+                "target_path": target.relative_to(ROOT).as_posix(),
+                "symbol_mappings": {},
+                "metadata": metadata,
+            }
+            if base is not None:
+                complete_units += 1
+                try:
+                    symbolize_base(target, base)
+                except Exception as exc:
+                    print(
+                        f"warning: could not symbolize {base}: {exc}",
+                        file=sys.stderr,
+                    )
+                unit["base_path"] = base.relative_to(ROOT).as_posix()
+                unit["symbol_mappings"] = symbol_mappings(
+                    target, base, version, program
+                )
+                mapping_count += len(unit["symbol_mappings"])
+
+            units.append(unit)
 
     return {
         "min_version": MIN_VERSION,

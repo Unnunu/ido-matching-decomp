@@ -159,10 +159,10 @@ make diff UNIT=7.1/ugen/build SYM=build_tree DIFF_FLAGS='-o /tmp/diff.json'
 
 To use the GUI, open the repository root in objdiff. The **Build** button and
 the on-save watcher rebuild the selected unit's base object automatically
-(`build_base` and `custom_make` are generated into `objdiff.json`). Unit names
-follow `<version>/<program>/<file>`, for example `7.1/ugen/build`. Library
-units use `<version>/<library>/<module>/<program>/<target>`, for example
-`7.1/libu/uini/ugen/ugen_04F430`.
+(`build_base` and `custom_make` are generated into `objdiff.json`). Program
+units follow `<version>/<program>/<file>`, for example `7.1/ugen/build`.
+Source-backed library units use `<version>/<library>/<program>/<member>`, for
+example `7.1/libu/ugen/uini`.
 
 Base objects are also given the target's local symbol names for anonymous
 data and functions (`RO_STR_...`, `D_...`, `func_...`) so objdiff can compare
@@ -229,7 +229,7 @@ in [PROGRESS.md](PROGRESS.md).
 ## Repository layout
 
 - `src/` - C and Pascal sources, organised by program plus `libu`, `libp` and
-  `mld` library sources.
+  `libmld` library sources.
 - `asm/<version>/<program>/` - generated disassembly, ignored by git.
 - `build/` - compiled base objects, assembled target objects, reports and
   progress data, ignored by git.

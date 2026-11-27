@@ -4,7 +4,7 @@ Statically linked library code is part of the program binaries.  Membership is
 encoded in the split names themselves: a row named ``library/member`` (for
 example ``libu/uini`` in ``symbols/<version>/ugen.splits.csv``) is library
 code, while a plain name is program code.  The matching base object is selected
-from ``build/src/<version>/<libu>/<uini>.o``.
+from ``build/src/<version>/<library>/<member>.o``.
 
 Ranges are reconstructed from ``symbols/<version>/<program>.splits.csv``: the
 end of a row is the start of the next row (which may be in the following
@@ -25,7 +25,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 VERSIONS = ("5.3", "7.1")
 
-LIBRARY_BASE_DIRS = {"libu": "libu", "libp": "libp", "libmld": "mld"}
 SOURCE_EXTS = (".c", ".p")
 DATA_SECTIONS = (".data", ".rodata")
 TEXT_SECTION = ".text"
@@ -222,21 +221,15 @@ def function_address(
 def library_base_path(
     version: str, library: str, module: str, root: Path = ROOT
 ) -> Path | None:
-    directory = LIBRARY_BASE_DIRS.get(library)
-    if directory is None:
-        return None
-    path = root / "build" / "src" / version / directory / f"{module}.o"
+    path = root / "build" / "src" / version / library / f"{module}.o"
     return path if path.is_file() else None
 
 
 def library_source_path(
     version: str, library: str, module: str, root: Path = ROOT
 ) -> Path | None:
-    directory = LIBRARY_BASE_DIRS.get(library)
-    if directory is None:
-        return None
     for ext in SOURCE_EXTS:
-        path = root / "src" / directory / f"{module}{ext}"
+        path = root / "src" / library / f"{module}{ext}"
         if path.is_file():
             return path
     return None

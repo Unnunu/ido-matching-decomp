@@ -32,13 +32,16 @@ objdiff` first when calling `objdiff-cli` directly.
 
 ## Units
 
-A unit is named `<version>/<program>/<file>`, for example:
+Program units are named `<version>/<program>/<file>`, for example:
 
 ```text
 7.1/ugen/build
 target_path = build/asm/7.1/ugen/build.o
 base_path   = build/src/7.1/ugen/build.o
 ```
+
+Library units are named `<version>/<library>/<program>/<file>`; see
+[Libraries embedded in program targets](#libraries-embedded-in-program-targets).
 
 `metadata.source_path` points at the C or Pascal source when it can be found.
 Targets without a built base object are skipped by default. Pass
@@ -69,25 +72,28 @@ offset,vram,.text
 - Names without `/` keep their program meaning. Continuations of a repeated
   program name get a `_2`, `_3`, ... suffix.
 
-`tools/gen_objdiff.py` emits extra library units for categories with a built
-base object (`libu`, `libp`, `libmld`; `libmld` uses the `mld` source/build
-folder for `sex.c`):
+`tools/gen_objdiff.py` emits library units only for members that have both a
+source and a built base object (`libu`, `libp`, `libmld`). Source and build
+folders match the library name (`src/libmld`,
+`build/src/<version>/libmld`):
 
 ```text
-7.1/ugen/libu/uini
+7.1/libu/ugen/uini
 target_path = build/asm/7.1/ugen/libu/uini.o
-base_path   = build/src/7.1/libu/uini.o
+base_path = build/src/7.1/libu/uini.o
 metadata.library_name = libu
 metadata.library_module = uini
 metadata.target_program = ugen
 metadata.target_rel = libu/uini
 ```
 
-These units exist for diffing and for objdiff fuzzy results. Progress skips
-them as program units and uses their per-function results to score the library
-bucket. Parts of `libmld` without a base object (`st_*`, `swap_*`, `ldf*`),
-plus `libelf`, `libc` and the Pascal runtime, are counted as unmatched library
-code.
+Library units live at `<version>/<library>/<program>/<member>`, not under the
+program branch. Members without source or without a target object are not
+emitted. These units exist for diffing and for objdiff fuzzy results. Progress
+skips them as program units and uses their per-function results to score the
+library bucket. Parts of `libmld` without a base object (`st_*`, `swap_*`,
+`ldf*`), plus `libelf`, `libc` and the Pascal runtime, are counted as unmatched
+library code.
 
 ## Symbol mappings
 

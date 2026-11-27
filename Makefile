@@ -114,7 +114,7 @@ CFLAGS += -G 0 -KPIC -Xcpluscomm $(IINC) -nostdinc -Wab,-r4300_mul \
 	$(IDO_WARNINGS) -D$(IDO_VERSION)
 
 # Per-directory optimization overrides needed to match the original binaries.
-build/src/7.1/mld/%.o: OPTFLAGS := -O2
+build/src/7.1/libmld/%.o: OPTFLAGS := -O2
 build/src/7.1/as0/%.o: OPTFLAGS := -O2
 build/src/7.1/as1/%.o: OPTFLAGS := -O2
 build/src/7.1/cfe/%.o: OPTFLAGS := -O2
@@ -125,7 +125,7 @@ build/src/5.3/as0/%.o: OPTFLAGS := -O2
 build/src/5.3/as0/%.o: MIPS_VERSION := -mips1
 build/src/5.3/libu/%.o: OPTFLAGS := -O2
 build/src/5.3/libp/%.o: OPTFLAGS := -O2
-build/src/5.3/mld/%.o: OPTFLAGS := -O2
+build/src/5.3/libmld/%.o: OPTFLAGS := -O2
 
 # ---------------------------------------------------------------------------
 # Sources and generated objects
