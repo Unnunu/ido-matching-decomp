@@ -7,10 +7,15 @@ to base mapping exists.  Target objects without a base object are still counted
 as unmatched so unstarted source files stay in the denominator.
 
 Library code is classified by ``library/member`` names in
-``symbols/<version>/<program>.splits.csv``.  Every copy of a library function in
-every program binary is counted separately, including static functions.  Data
-sections are assigned to a library only when a split row covers the whole split
-section interval.
+``symbols/<version>/<program>.splits.csv``.  Report library units are named
+``<version>/<library>/<program>/<member>`` and use the shared base object at
+``build/src/<version>/<library>/<member>.o``.  Every copy of a library function
+in every program binary is counted separately, including static functions.
+Data sections are assigned to a library only when a split row covers the whole
+split section interval.  In each section, everything after the first library
+range is non-program: it is either library code or belongs to nobody and is
+excluded from progress.  Target objects are enumerated from ``asm`` so stale
+``build/asm`` objects from older splits cannot affect progress.
 """
 
 from __future__ import annotations
@@ -32,6 +37,7 @@ from library import (
     function_address,
     library_base_path,
     section_intervals,
+    section_start,
     section_starts,
     split_intervals,
 )
@@ -40,8 +46,10 @@ ROOT = Path(__file__).resolve().parent.parent
 REPORT = ROOT / "build/report.json"
 MARKDOWN = ROOT / "PROGRESS.md"
 ASM_BUILD_ROOT = ROOT / "build/asm"
+ASM_ROOT = ROOT / "asm"
 
 VERSIONS = ("5.3", "7.1")
+TARGET_SUFFIXES = (".text.s", ".data.s", ".rodata.s", ".bss.s")
 
 # Symbols that are not part of the decompilation denominator.  Keep these
 # anchored so ordinary functions such as current_address_pair_start or
@@ -140,6 +148,10 @@ def is_excluded_unit(rel: str) -> bool:
     return is_excluded_name(Path(rel).name)
 
 
+def is_padding_unit(rel: str) -> bool:
+    return Path(rel).name.startswith("pad_")
+
+
 def load_overrides(version: str, program: str) -> dict[str, str]:
     path = ROOT / "symbols" / version / f"{program}.match_overrides.txt"
     if not path.is_file():
@@ -163,7 +175,7 @@ def load_report(path: Path) -> dict:
         return json.load(f)
 
 
-def load_symbol_mappings() -> dict[str, dict[str, str]]:
+def load_objdiff_units() -> dict[str, dict]:
     path = ROOT / "objdiff.json"
     if not path.is_file():
         return {}
@@ -173,9 +185,16 @@ def load_symbol_mappings() -> dict[str, dict[str, str]]:
     except (OSError, json.JSONDecodeError):
         return {}
     return {
-        unit.get("name", ""): unit.get("symbol_mappings", {})
+        unit.get("name", ""): unit
         for unit in config.get("units", [])
         if unit.get("name")
+    }
+
+
+def symbol_mappings_from_units(units: dict[str, dict]) -> dict[str, dict[str, str]]:
+    return {
+        name: unit.get("symbol_mappings", {})
+        for name, unit in units.items()
     }
 
 
@@ -207,32 +226,101 @@ def section_fuzzy_by_name(unit: dict | None) -> dict[str, float]:
 
 
 def is_library_unit_name(name: str, library_names: set[str]) -> bool:
-    parts = name.split("/", 4)
-    return len(parts) == 5 and parts[1] in library_names
+    parts = name.split("/")
+    return len(parts) == 4 and parts[1] in library_names
+
+
+def library_unit_key(
+    unit: dict,
+    library_names: set[str],
+    config_unit: dict | None = None,
+) -> tuple[str, str, str, str, str] | None:
+    """Return ``(version, program, target_rel, library, member)``.
+
+    The objdiff report drops the library metadata fields, so fall back to the
+    generated ``objdiff.json`` unit and finally to the four-part unit name.
+    """
+
+    name = unit.get("name", "")
+    version = name.split("/", 1)[0]
+    metadata: dict = {}
+    if config_unit is not None:
+        metadata.update(config_unit.get("metadata") or {})
+    metadata.update(unit.get("metadata") or {})
+
+    library = metadata.get("library_name")
+    module = metadata.get("library_module")
+    program = metadata.get("target_program")
+    rel = metadata.get("target_rel")
+    if not (library and module and program and rel):
+        parts = name.split("/")
+        if len(parts) != 4 or parts[1] not in library_names:
+            return None
+        version, library, program, module = parts
+        rel = f"{library}/{module}"
+    return (version, program, rel, library, module)
 
 
 def library_report_units(
-    report: dict, library_names: set[str]
+    report: dict, library_names: set[str], config_units: dict[str, dict]
 ) -> dict[tuple[str, str, str, str, str], dict]:
     units: dict[tuple[str, str, str, str, str], dict] = {}
     for unit in report.get("units", []):
         name = unit.get("name", "")
-        parts = name.split("/", 4)
-        if len(parts) == 5 and parts[1] in library_names:
-            version, library, module, program, rel = parts
-            units[(version, program, rel, library, module)] = unit
-            continue
-        metadata = unit.get("metadata", {})
-        if not metadata.get("library"):
-            continue
-        version = name.split("/", 1)[0]
-        program = metadata.get("target_program")
-        rel = metadata.get("target_rel")
-        library = metadata.get("library_name")
-        module = metadata.get("library_module")
-        if program and rel and library and module:
-            units[(version, program, rel, library, module)] = unit
+        key = library_unit_key(unit, library_names, config_units.get(name))
+        if key is not None:
+            units[key] = unit
     return units
+
+
+def disassembled_programs(version: str) -> set[str]:
+    """Programs whose disassembly was generated by the current ``make disasm``."""
+
+    version_dir = ASM_ROOT / version
+    if not version_dir.is_dir():
+        return set()
+    return {
+        path.name
+        for path in version_dir.iterdir()
+        if path.is_dir() and (path / ".disasm").is_file()
+    }
+
+
+def target_objects(
+    version: str,
+    asm_build_root: Path,
+    split_names: set[tuple[str, str]] | None = None,
+) -> list[tuple[str, str, Path]]:
+    """List target objects present in the disassembly tree.
+
+    Scanning ``build/asm`` directly would include stale objects left by older
+    splits.  Deriving the list from ``asm`` keeps progress consistent with
+    ``gen_objdiff.py`` and ignores those stale files.  When ``split_names`` is
+    given, objects whose split row was removed are ignored too, so stale ``asm``
+    files cannot keep old content in progress.
+    """
+
+    version_dir = ASM_ROOT / version
+    if not version_dir.is_dir():
+        return []
+
+    objects: list[tuple[str, str, Path]] = []
+    for program_dir in sorted(path for path in version_dir.iterdir() if path.is_dir()):
+        program = program_dir.name
+        rels: set[str] = set()
+        for source in sorted(program_dir.rglob("*.s")):
+            relative = source.relative_to(program_dir).as_posix()
+            for suffix in TARGET_SUFFIXES:
+                if relative.endswith(suffix):
+                    rels.add(relative[: -len(suffix)])
+                    break
+        for rel in sorted(rels):
+            if split_names is not None and (program, rel) not in split_names:
+                continue
+            target_path = asm_build_root / version / program / f"{rel}.o"
+            if target_path.is_file():
+                objects.append((program, rel, target_path))
+    return objects
 
 
 def load_units(
@@ -245,6 +333,16 @@ def load_units(
     seen_signatures: dict[tuple[str, str], set[tuple]] = {}
     starts = {version: section_starts(version) for version in VERSIONS}
     splits = {version: split_intervals(version) for version in VERSIONS}
+    split_names = {
+        version: {
+            (program, name)
+            for (program, _section, name) in splits[version]
+        }
+        for version in VERSIONS
+    }
+    active_programs = {
+        version: disassembled_programs(version) for version in VERSIONS
+    }
 
     for unit in report.get("units", []):
         name = unit.get("name", "")
@@ -256,6 +354,10 @@ def load_units(
             continue
         version, program, rel = parts
         if version not in VERSIONS or is_excluded_unit(rel):
+            continue
+        if program not in active_programs[version]:
+            continue
+        if (program, rel) not in split_names[version]:
             continue
 
         source_path = metadata.get("source_path")
@@ -305,64 +407,79 @@ def load_units(
         )
 
     for version in VERSIONS:
-        version_dir = asm_build_root / version
-        if not version_dir.is_dir():
-            continue
-        for program_dir in sorted(path for path in version_dir.iterdir() if path.is_dir()):
-            program = program_dir.name
-            for target_path in sorted(program_dir.rglob("*.o")):
-                if target_path in report_target_paths:
-                    continue
-                rel = target_path.relative_to(program_dir).with_suffix("").as_posix()
-                if is_excluded_unit(rel):
-                    continue
+        for program, rel, target_path in target_objects(
+            version, asm_build_root, split_names[version]
+        ):
+            if program not in active_programs[version]:
+                continue
+            if target_path in report_target_paths:
+                continue
+            if is_excluded_unit(rel):
+                continue
 
-                target_elf = read_elf(target_path)
-                if not target_elf.functions and not target_elf.sections:
-                    continue
-                if target_elf.functions:
-                    signature = ("functions", target_signature(target_elf.functions))
-                else:
-                    signature = ("data", target_data_signature(target_elf.sections))
-                seen = seen_signatures.setdefault((version, program), set())
-                if signature in seen:
-                    continue
-                seen.add(signature)
+            target_elf = read_elf(target_path)
+            if not target_elf.functions and not target_elf.sections:
+                continue
+            if target_elf.functions:
+                signature = ("functions", target_signature(target_elf.functions))
+            else:
+                signature = ("data", target_data_signature(target_elf.sections))
+            seen = seen_signatures.setdefault((version, program), set())
+            if signature in seen:
+                continue
+            seen.add(signature)
 
-                intervals = section_intervals(
-                    starts[version],
-                    program,
-                    rel,
-                    target_elf.sections,
-                    splits[version],
-                )
-                functions = [
-                    {
-                        "name": function["name"],
-                        "size": function["size"],
-                        "address": function["address"],
-                        "section": function["section"],
-                        "fuzzy": None,
-                    }
-                    for function in target_elf.functions
-                ]
-                units.append(
-                    {
-                        "version": version,
-                        "program": program,
-                        "rel": rel,
-                        "target_path": target_path,
-                        "report_unit": None,
-                        "functions": functions,
-                        "sections": target_elf.sections,
-                        "intervals": intervals,
-                        "has_source": False,
-                        "base_path": None,
-                        "unit_name": f"{version}/{program}/{rel}",
-                    }
-                )
+            intervals = section_intervals(
+                starts[version],
+                program,
+                rel,
+                target_elf.sections,
+                splits[version],
+            )
+            functions = [
+                {
+                    "name": function["name"],
+                    "size": function["size"],
+                    "address": function["address"],
+                    "section": function["section"],
+                    "fuzzy": None,
+                }
+                for function in target_elf.functions
+            ]
+            units.append(
+                {
+                    "version": version,
+                    "program": program,
+                    "rel": rel,
+                    "target_path": target_path,
+                    "report_unit": None,
+                    "functions": functions,
+                    "sections": target_elf.sections,
+                    "intervals": intervals,
+                    "has_source": False,
+                    "base_path": None,
+                    "unit_name": f"{version}/{program}/{rel}",
+                }
+            )
 
     return units
+
+
+def library_section_cutoffs(version: str) -> dict[tuple[str, str], int]:
+    """First library address in each program section.
+
+    Once a section reaches its first library range, everything later is not
+    program code.  It is either part of a library range or belongs to nobody
+    and is left out of progress entirely.
+    """
+
+    cutoffs: dict[tuple[str, str], int] = {}
+    for (program, section, name), (start, _end) in split_intervals(version).items():
+        if "/" not in name:
+            continue
+        key = (program, section)
+        cutoffs[key] = min(cutoffs.get(key, start), start)
+    return cutoffs
 
 
 def classify(
@@ -370,6 +487,7 @@ def classify(
     ranges: dict[str, LibraryRanges],
     library_units: dict[tuple[str, str, str, str, str], dict],
     starts: dict[str, dict],
+    cutoffs: dict[str, dict[tuple[str, str], int]],
     overrides: dict[tuple[str, str], dict[str, str]],
 ) -> list[dict]:
     classified: list[dict] = []
@@ -394,6 +512,7 @@ def classify(
             if action == "ignored":
                 continue
 
+            section = function.get("section", ".text")
             address = None
             try:
                 if function.get("address") is not None:
@@ -401,7 +520,7 @@ def classify(
                         starts[version],
                         program,
                         rel,
-                        function.get("section", ".text"),
+                        section,
                         int(function["address"]),
                     )
             except (TypeError, ValueError):
@@ -409,9 +528,20 @@ def classify(
 
             match = (
                 ranges[version].find(program, address)
-                if address is not None and function.get("section") == ".text"
+                if address is not None and section == ".text"
                 else None
             )
+            if match is None and is_padding_unit(rel):
+                continue
+            cutoff = cutoffs[version].get((program, section))
+            if (
+                match is None
+                and cutoff is not None
+                and address is not None
+                and address >= cutoff
+            ):
+                continue
+
             record = {
                 "name": name,
                 "size": int(function.get("size", 0)),
@@ -431,7 +561,7 @@ def classify(
                     version, category[0], category[1]
                 )
                 record["mapping_unit"] = (
-                    f"{version}/{category[0]}/{category[1]}/{program}/{rel}"
+                    f"{version}/{category[0]}/{program}/{category[1]}"
                 )
                 library_functions[category].append(record)
             else:
@@ -449,11 +579,28 @@ def classify(
             if total <= 0:
                 continue
 
+            interval_start = (
+                interval[0]
+                if interval is not None
+                else section_start(
+                    starts[version], program, rel, section_name
+                )
+            )
             match = (
                 ranges[version].find_section(program, interval[0], interval[1])
                 if interval is not None
                 else None
             )
+            if match is None and is_padding_unit(rel):
+                continue
+            cutoff = cutoffs[version].get((program, section_name))
+            if (
+                match is None
+                and cutoff is not None
+                and interval_start is not None
+                and interval_start >= cutoff
+            ):
+                continue
             if match is not None:
                 category = match.category
                 library_unit = library_units.get(
@@ -673,47 +820,81 @@ def section_percent(measures: dict, section_name: str) -> str:
 def render_markdown(result: dict) -> str:
     programs = result["programs"]
     libraries = result["libraries"]
-    versions = result["versions"]
+    versions = sorted(
+        {key.split("/", 1)[0] for key in (*programs, *libraries)},
+        reverse=True,
+    )
 
-    lines = [
-        "# Progress",
-        "",
-        "| Version | Program | Functions | Matched | Code | .data | .rodata |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
-    ]
-
-    def row(label_version: str, label_program: str, measures: dict) -> str:
+    def row(label_version: str, label: str, measures: dict) -> str:
         return (
-            f"| {label_version} | {label_program} | {measures['functions']} | "
+            f"| {label_version} | {label} | {measures['functions']} | "
             f"{measures['matched_functions']} | "
             f"{percent(measures['matched_code'], measures['code'])} | "
             f"{section_percent(measures, '.data')} | "
             f"{section_percent(measures, '.rodata')} |"
         )
 
-    for version in sorted(versions, reverse=True):
-        for key in sorted(programs):
-            program_version, program_name = key.split("/", 1)
-            if program_version != version:
+    def subtotal(scope: dict[str, dict], version: str | None = None) -> dict:
+        measures = empty_measures()
+        for key, value in scope.items():
+            if version is not None and key.split("/", 1)[0] != version:
                 continue
-            lines.append(row(version, program_name, programs[key]))
-        for key in sorted(libraries):
-            library_version, library_name = key.split("/", 1)
-            if library_version != version:
-                continue
-            lines.append(row(version, f"{library_name} (library)", libraries[key]))
-        lines.append(row(version, "**subtotal**", versions[version]))
+            add_measures(measures, value)
+        return measures
 
-    lines.append(row("**all**", "", result["totals"]))
-    lines.append("")
-    lines.append("Percentages are matched byte percentages.")
-    lines.append("")
-    lines.append(
-        "Library rows are statically linked library code found in target "
-        "objects. They are counted separately from the program that embeds "
-        "them; library splits are named `library/member`."
+    def table(title: str, label: str, scope: dict[str, dict]) -> list[str]:
+        lines = [
+            f"## {title}",
+            "",
+            f"| Version | {label} | Functions | Matched | Code | .data | .rodata |",
+            "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
+        ]
+        for version in versions:
+            rows = [
+                row(version, name, scope[key])
+                for key in sorted(scope)
+                for key_version, name in [key.split("/", 1)]
+                if key_version == version
+            ]
+            if not rows:
+                continue
+            lines.extend(rows)
+            lines.append(row(version, "**subtotal**", subtotal(scope, version)))
+        lines.append(row("**all**", f"**all {title.lower()}**", subtotal(scope)))
+        lines.append("")
+        return lines
+
+    def summary_row(label: str, measures: dict) -> str:
+        return (
+            f"| {label} | {measures['functions']} | "
+            f"{measures['matched_functions']} | "
+            f"{percent(measures['matched_code'], measures['code'])} | "
+            f"{section_percent(measures, '.data')} | "
+            f"{section_percent(measures, '.rodata')} |"
+        )
+
+    lines = ["# Progress", ""]
+    lines.extend(table("Programs", "Program", programs))
+    lines.extend(table("Libraries", "Library", libraries))
+    lines.extend(
+        [
+            "## Total",
+            "",
+            "| Scope | Functions | Matched | Code | .data | .rodata |",
+            "| --- | ---: | ---: | ---: | ---: | ---: |",
+            summary_row("Programs", subtotal(programs)),
+            summary_row("Libraries", subtotal(libraries)),
+            summary_row("**All**", result["totals"]),
+            "",
+            "Percentages are matched byte percentages.",
+            "",
+            "Only programs with a generated disassembly (`.disasm` stamp) are "
+            "included. Library rows are statically linked library code found in "
+            "target objects. They are counted separately from the program that "
+            "embeds them; library splits are named `library/member`.",
+            "",
+        ]
     )
-    lines.append("")
     return "\n".join(lines)
 
 
@@ -741,17 +922,21 @@ def main() -> int:
         for version_ranges in ranges.values()
         for library, _module in version_ranges.categories()
     }
+    config_units = load_objdiff_units()
     units = load_units(report, ASM_BUILD_ROOT, library_names)
     starts = {version: section_starts(version) for version in VERSIONS}
-    library_units = library_report_units(report, library_names)
-    symbol_mappings = load_symbol_mappings()
+    cutoffs = {version: library_section_cutoffs(version) for version in VERSIONS}
+    library_units = library_report_units(report, library_names, config_units)
+    symbol_mappings = symbol_mappings_from_units(config_units)
     overrides: dict[tuple[str, str], dict[str, str]] = {}
     for unit in units:
         key = (unit["version"], unit["program"])
         if key not in overrides:
             overrides[key] = load_overrides(*key)
 
-    classified = classify(units, ranges, library_units, starts, overrides)
+    classified = classify(
+        units, ranges, library_units, starts, cutoffs, overrides
+    )
     match(classified, symbol_mappings)
     result = aggregate(classified)
 

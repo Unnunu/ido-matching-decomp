@@ -189,7 +189,21 @@ make progress   # regenerates PROGRESS.md
 The objdiff report (`build/report.json`) is the source of truth. A function
 counts as matched only when objdiff reports a 100% fuzzy match. Target objects
 without a built base object are still counted in the denominator as unmatched,
-so unstarted source files cannot disappear from progress.
+so unstarted source files cannot disappear from progress. Target objects are
+listed from `asm/` and must still have a current split row, so stale `asm` and
+`build/asm` objects from removed splits are ignored.
+
+Source-backed library units are named
+`<version>/<library>/<program>/<member>` and use
+`build/src/<version>/<library>/<member>.o`; this includes `libmld`, whose source
+and build directory match the library name. Library code is counted in separate
+`libu`, `libp`, `libmld`, `libelf` and `libc` rows, while library members
+without a source or base object remain in the denominator as unmatched.
+
+In each section, everything after the first library range is non-program. It is
+counted as library when it falls inside a library range; otherwise it belongs to
+nobody and is excluded from progress. `pad_*` objects are linker artifacts;
+their non-library functions and data are ignored.
 
 The tools exclude `__start`, `_mcount`, `_ftext`, `_rld_*`, crt/runtime symbols
 and `*.NON_MATCHING` aliases. `NON_MATCHING` markers are derived from objdiff
