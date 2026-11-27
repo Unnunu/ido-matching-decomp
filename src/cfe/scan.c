@@ -63,7 +63,7 @@ void cpp_write(char* data, int size) {
 
         input_file = fopen(name, "w+");
         if (input_file == NULL) {
-            error(0x2001A, LEVEL_FATAL, -1, infile != NULL ? infile : "");
+            error(MSG_TEMP_FILE_OPEN_FAIL, LEVEL_FATAL, -1, infile != NULL ? infile : "");
         } else {
             // remove this file when it's closed
             unlink(name);
@@ -71,13 +71,13 @@ void cpp_write(char* data, int size) {
 
         fwrite(data, 1, size, input_file);
         if (ferror(input_file)) {
-            error(0x10047, LEVEL_FATAL, -1, name);
+            error(MSG_CANNOT_WRITE_FILE, LEVEL_FATAL, -1, name);
         }
         input_file_status = 2;
     } else {
         fwrite(data, 1, size, input_file);
         if (ferror(input_file)) {
-            error(0x10047, LEVEL_FATAL, -1, "temporary for buffering");
+            error(MSG_CANNOT_WRITE_FILE, LEVEL_FATAL, -1, "temporary for buffering");
         }
     }
 }
@@ -127,7 +127,7 @@ static int scan_line_directive(int* line, char* filename, int* hasFilename) {
             continue;
         } else {
         out:
-            if (origfile == 0) {
+            if (origfile == NULL) {
                 register_file("", 1);
             }
 
@@ -208,7 +208,7 @@ static int fill_input_buffer(void) {
         }
 
         if (input_file_status == 0) {
-            error(0x20095, LEVEL_WARNING, 0);
+            error(MSG_NULL_INPUT, LEVEL_WARNING, 0);
             return FALSE;
         }
 
@@ -228,7 +228,7 @@ static int fill_input_buffer(void) {
         nread = fread(input_buffer + 1, 1, BUFFER_SIZE, input_file);
         input_buffer[1 + nread] = 0;
         if (ferror(input_file)) {
-            error(0x10046, LEVEL_FATAL, -1, "temporary for buffering");
+            error(MSG_FAIL_READ_FILE, LEVEL_FATAL, -1, "temporary for buffering");
             return 0;
         }
         if (nread == 0) {
@@ -418,7 +418,7 @@ static int scan_number(int hasDot) {
                     c1 = input();
                 }
             } else {
-                error(0x2000E, LEVEL_ERROR, curloc, c1);
+                error(MSG_ILLEGAL_EXPONENT_CHAR, LEVEL_ERROR, curloc, c1);
             }
             break;
         } else {
@@ -476,13 +476,13 @@ out:
         int hasOverflow = FALSE;
 
         if (isLongLong && IS_STRICT_ANSI) {
-            error(0x20131, LEVEL_WARNING, curloc, "long long constants (LL)");
+            error(MSG_NON_ANSI_KEYWORD, LEVEL_WARNING, curloc, "long long constants (LL)");
         }
 
         if (isHex) {
             if (buf_ptr == token + 2) {
                 isEmptyHex = TRUE;
-                error(0x2010B, LEVEL_DEFAULT, curloc);
+                error(MSG_ILLEGAL_HEX_CONSTANT, LEVEL_DEFAULT, curloc);
             }
             for (int_ptr = token + 2; int_ptr < buf_ptr; int_ptr++) {
                 if (!isxdigit(*int_ptr)) {
@@ -537,7 +537,7 @@ out:
             }
         } else {
             if (invalidOctalDigit) {
-                error(0x20019, LEVEL_ERROR, curloc, invalidOctalDigit);
+                error(MSG_ILLEGAL_OCTAL_DIGIT, LEVEL_ERROR, curloc, invalidOctalDigit);
                 isOctal = FALSE;
             }
 
@@ -570,9 +570,9 @@ out:
 
         if (!isEmptyHex) {
             if (hasOverflow) {
-                error(0x2000F, LEVEL_DEFAULT, curloc);
+                error(MSG_CONSTANT_OUT_OF_RANGE_TRUNCATED, LEVEL_DEFAULT, curloc);
             } else if ((IS_STRICT_ANSI || options[OPTION_FULLWARN]) && hasTypePromotion) {
-                error(0x20010, LEVEL_DEFAULT, curloc);
+                error(MSG_CONSTANT_OUT_OF_RANGE_32BIT, LEVEL_DEFAULT, curloc);
             }
         }
 
@@ -633,7 +633,7 @@ out:
 
         if (options[OPTION_LINT_FLAGS] && !(options[OPTION_LINT_FLAGS] & 0x40) && (isHex || isOctal && bitSize != 0) &&
             bitSize < sizeof_type(TREE_CODE(TREE_TYPE(yylval.node)))) {
-            error(0x7014D, LEVEL_WARNING, curloc, bitSize, isHex ? "hex" : "octal",
+            error(MSG_PARTIAL_BIT_CONSTANT, LEVEL_WARNING, curloc, bitSize, isHex ? "hex" : "octal",
                   get_type_name(TREE_CODE(TREE_TYPE(yylval.node))));
         }
         return CONSTANT;
@@ -655,7 +655,7 @@ restart:
         case 0:
             goto eof;
         case '\n':
-            error(0x20014, LEVEL_ERROR, curloc);
+            error(MSG_NEWLINE_IN_CONSTANT, LEVEL_ERROR, curloc);
         return_false:
             return FALSE;
         case '\\':
@@ -675,7 +675,7 @@ restart:
                         *out_buf = unescape(*out_buf);
                     } else {
                         *out_buf = 'a';
-                        error(0x20018, LEVEL_DEFAULT, curloc, *out_buf);
+                        error(MSG_UNKNOWN_ESCAPE_SEQUENCE, LEVEL_DEFAULT, curloc, *out_buf);
                     }
                     break;
                 case '0':
@@ -699,7 +699,7 @@ restart:
                         }
 
                         if (value > 255) {
-                            error(0x20015, LEVEL_DEFAULT, curloc, value, 255);
+                            error(MSG_OCTAL_ESCAPE_TOO_LARGE, LEVEL_DEFAULT, curloc, value, 255);
                         }
                         *out_buf = value;
                         break;
@@ -718,7 +718,7 @@ restart:
                             }
                             unput();
                             if (value > 255 || (int)value < 0) {
-                                error(0x20016, LEVEL_DEFAULT, curloc, value, 255);
+                                error(MSG_HEX_ESCAPE_TOO_LARGE, LEVEL_DEFAULT, curloc, value, 255);
                             }
                             *out_buf = value;
                             break;
@@ -729,7 +729,7 @@ restart:
 
                     *out_buf = 'x';
                     if (!IS_ANSI) {
-                        error(0x20018, LEVEL_DEFAULT, curloc, *out_buf);
+                        error(MSG_UNKNOWN_ESCAPE_SEQUENCE, LEVEL_DEFAULT, curloc, *out_buf);
                     }
                     if (forbidNumeric) {
                         *hasNumeric = TRUE;
@@ -737,11 +737,11 @@ restart:
                     break;
                 case 0:
                 eof:
-                    error(0x20017, LEVEL_ERROR, curloc);
+                    error(MSG_UNEXPECTED_EOF, LEVEL_ERROR, curloc);
                     goto return_false;
                 default:
                     if (islower(*out_buf)) {
-                        error(0x20018, LEVEL_DEFAULT, curloc, *out_buf);
+                        error(MSG_UNKNOWN_ESCAPE_SEQUENCE, LEVEL_DEFAULT, curloc, *out_buf);
                     }
                     break;
             }
@@ -796,7 +796,7 @@ static int read_wstring_character(char stopChar, char* buffer) {
                         }
                         unput();
                         if (hasOverflow) {
-                            error(0x20016, LEVEL_DEFAULT, curloc, value, ULONG_MAX);
+                            error(MSG_HEX_ESCAPE_TOO_LARGE, LEVEL_DEFAULT, curloc, value, ULONG_MAX);
                         }
                         *(int*)buffer = value;
                         break;
@@ -877,7 +877,7 @@ static int scan_char(void) {
 
     len = ptr - token;
     if (len > 4 || len == 0) {
-        error(0x20011, LEVEL_DEFAULT, curloc);
+        error(MSG_CHAR_CONSTANT_SIZE_OUT_OF_RANGE, LEVEL_DEFAULT, curloc);
     }
     len = ptr - token;
     switch (len) {
@@ -941,7 +941,7 @@ static int scan_wchar(void) {
     return CONSTANT;
 }
 
-static void func_004141BC(void) {
+void func_004141BC(void) {
 }
 
 static int scan_identifier(char firstChar) {
@@ -1119,7 +1119,7 @@ label2:
                 }
 
                 if (c1 == '=') {
-                    error(0x20111, LEVEL_DEFAULT, curloc, "+=");
+                    error(MSG_OPERATOR_SPACING_IGNORED, LEVEL_DEFAULT, curloc, "+=");
                     yylval.location = curloc;
                     return ADD_ASSIGN;
                 }
@@ -1159,7 +1159,7 @@ label2:
                 }
 
                 if (c1 == '=') {
-                    error(0x20111, LEVEL_DEFAULT, curloc, "-=");
+                    error(MSG_OPERATOR_SPACING_IGNORED, LEVEL_DEFAULT, curloc, "-=");
                     yylval.location = curloc;
                     return SUB_ASSIGN;
                 }
@@ -1183,7 +1183,7 @@ label2:
                         }
                         unput();
                     } else if (c == 0) {
-                        error(0x20017, LEVEL_ERROR, curloc, c);
+                        error(MSG_UNEXPECTED_EOF, LEVEL_ERROR, curloc, c);
                         break;
                     }
                 }
@@ -1197,7 +1197,7 @@ label2:
                 }
 
                 if (c1 == '=') {
-                    error(0x20111, LEVEL_DEFAULT, curloc, "/=");
+                    error(MSG_OPERATOR_SPACING_IGNORED, LEVEL_DEFAULT, curloc, "/=");
                     yylval.location = curloc;
                     return DIV_ASSIGN;
                 }
@@ -1219,7 +1219,7 @@ label2:
                 }
 
                 if (c1 == '=') {
-                    error(0x20111, LEVEL_DEFAULT, curloc, "%=");
+                    error(MSG_OPERATOR_SPACING_IGNORED, LEVEL_DEFAULT, curloc, "%=");
                     yylval.location = curloc;
                     return REM_ASSIGN;
                 }
@@ -1246,7 +1246,7 @@ label2:
                     }
 
                     if (c1 == '=') {
-                        error(0x20111, LEVEL_DEFAULT, curloc, "&=");
+                        error(MSG_OPERATOR_SPACING_IGNORED, LEVEL_DEFAULT, curloc, "&=");
                         yylval.location = curloc;
                         return AND_ASSIGN;
                     }
@@ -1273,7 +1273,7 @@ label2:
                 }
 
                 if (c1 == '=') {
-                    error(0x20111, LEVEL_DEFAULT, curloc, "|=");
+                    error(MSG_OPERATOR_SPACING_IGNORED, LEVEL_DEFAULT, curloc, "|=");
                     yylval.location = curloc;
                     return OR_ASSIGN;
                 }
@@ -1295,7 +1295,7 @@ label2:
                 }
 
                 if (c1 == '=') {
-                    error(0x20111, LEVEL_DEFAULT, curloc, "^=");
+                    error(MSG_OPERATOR_SPACING_IGNORED, LEVEL_DEFAULT, curloc, "^=");
                     yylval.location = curloc;
                     return XOR_ASSIGN;
                 }
@@ -1336,7 +1336,7 @@ label2:
                     }
 
                     if (c1 == '=') {
-                        error(0x20111, LEVEL_DEFAULT, curloc, "*=");
+                        error(MSG_OPERATOR_SPACING_IGNORED, LEVEL_DEFAULT, curloc, "*=");
                         yylval.location = curloc;
                         return MUL_ASSIGN;
                     }
@@ -1384,7 +1384,7 @@ label2:
                     }
 
                     if (c1 == '=') {
-                        error(0x20111, LEVEL_DEFAULT, curloc, "<<=");
+                        error(MSG_OPERATOR_SPACING_IGNORED, LEVEL_DEFAULT, curloc, "<<=");
                         yylval.location = curloc;
                         return LEFT_ASSIGN;
                     }
@@ -1416,7 +1416,7 @@ label2:
                     }
 
                     if (c1 == '=') {
-                        error(0x20111, LEVEL_DEFAULT, curloc, ">>=");
+                        error(MSG_OPERATOR_SPACING_IGNORED, LEVEL_DEFAULT, curloc, ">>=");
                         yylval.location = curloc;
                         return RIGHT_ASSIGN;
                     }
@@ -1501,9 +1501,9 @@ label2:
             /* fallthrough */
         default:
             if (isprint(c)) {
-                error(0x2000C, LEVEL_DEFAULT, curloc, c);
+                error(MSG_UNKNOWN_CHAR_IGNORED, LEVEL_DEFAULT, curloc, c);
             } else {
-                error(0x2000D, LEVEL_DEFAULT, curloc, c);
+                error(MSG_UNKNOWN_CONTROL_CHAR_IGNORED, LEVEL_DEFAULT, curloc, c);
             }
             goto restart;
     }
