@@ -1,28 +1,24 @@
 #!/usr/bin/env python3
-"""Copy missing local target symbols into a base object for objdiff.
+"""Give the base object the target's local symbol names for objdiff.
 
-The IDO build often leaves anonymous local data and static functions unnamed,
-while spimdisasm gives the corresponding target symbols names such as
-``RO_STR_...``, ``D_...`` and ``func_...``. objdiff can only pair symbols that
-exist on both sides, so without this step the whole base ``.rodata`` section is
-matched against one target blob and the GUI cannot show string-by-string
-comparisons.
+IDO often emits anonymous local data and static functions, while spimdisasm
+names the target side ``RO_STR_...``, ``D_...`` and ``func_...``.  objdiff can
+only pair symbols that exist on both sides, so without mirroring it compares the
+whole base ``.data``/``.rodata`` section against one target blob.  That produces
+misleading scores: ``7.1/cfe/error`` reported 97.2% for identical 352-byte
+``.rodata`` because 19 bytes were treated as an insertion.
 
-This tool adds the missing local target symbols to the base object's symbol
-table. It only changes symbol metadata; section contents, relocations and the
-rest of the object are left untouched.
+This module copies the missing target symbols into the base ``.symtab`` and
+prefers real names from ``.mdebug`` over synthetic ones.  BSS is the hard case:
+the target uses size-0 ``B_...`` labels while the base may only have
+``[.bss]+offset``, so a correct reference looks different.  Missing labels are
+mirrored, with a per-section shift inferred from matching ``R_MIPS_LO16``
+relocations; ``7.1/cfe/c`` has ``B_10020F10`` at target ``0x10`` while the base
+variable is at ``0x3e90``.
 
-BSS labels need special handling. spimdisasm names target BSS ranges ``B_...``
-but emits them as size-0 local labels, while the compiler often leaves the base
-with only a ``.bss`` section symbol plus relocation addends. objdiff resolves
-section relocations to the nearest named symbol, so without mirroring, target
-relocations use ``B_...`` while base relocations use ``[.bss]+offset`` and a
-correct reference is reported as a mismatch. Missing target BSS labels are
-therefore copied to the base, but only when the base has no symbol at the
-destination offset. They keep size 0 and ``STT_NOTYPE``. If a target split
-covers only part of the base ``.bss`` (or the compiler ordered BSS variables
-differently), the destination is shifted by a per-section delta inferred from
-matching ``R_MIPS_LO16`` relocations.
+Only symbol metadata is changed; section contents and relocations are left
+alone.  Mirrored data symbols become ``STT_OBJECT`` so objdiff does not
+truncate the section blob.
 """
 
 from __future__ import annotations

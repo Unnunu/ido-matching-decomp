@@ -1,19 +1,23 @@
-"""Library membership by target address range.
+"""Library ownership for code statically linked into the target programs.
 
-Statically linked library code is part of the program binaries.  Membership is
-encoded in the split names themselves: a row named ``library/member`` (for
-example ``libu/uini`` in ``symbols/<version>/ugen.splits.csv``) is library
-code, while a plain name is program code.  The matching base object is selected
-from ``build/src/<version>/<library>/<member>.o``.
+The IDO binaries embed ``libu``, ``libp``, ``libmld``, ``libelf``, ``libc`` and
+friends.  Counting those functions as program code makes a program look
+unstarted, so membership is encoded directly in the split CSVs: a row named
+``library/member`` is library code, a plain row is program code.  There is no
+separate catalog; the split names are the source of truth.
 
-Ranges are reconstructed from ``symbols/<version>/<program>.splits.csv``: the
-end of a row is the start of the next row (which may be in the following
-section).  ``.text`` ranges may start and end at function boundaries inside a
-split; ``.data``/``.rodata`` ranges cover a complete target section interval
-because matching is section based.
+This module turns those names back into address ranges and finds the source and
+base object for a member, e.g. ``libu/uini`` in
+``symbols/7.1/ugen.splits.csv`` -> ``src/libu/uini.c`` and
+``build/src/7.1/libu/uini.o``.  A split ends where the next row starts, because
+object section sizes include trailing padding that would otherwise swallow the
+next member.  Data-only members such as ``libp/data`` have ``.data``/``.rodata``
+rows but no ``.text`` row.
 
-Only libu/libp/libmld have source and built base objects today.  Other library
-categories are still counted, but as unmatched until a base object exists.
+``progress.py`` uses the ranges to score library copies separately from the
+program that embeds them; ``gen_objdiff.py`` uses the paths to emit library
+units.  Only libu/libp/libmld have sources and base objects today; the rest are
+counted as unmatched.
 """
 
 from __future__ import annotations

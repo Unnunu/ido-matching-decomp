@@ -1,5 +1,21 @@
 #!/usr/bin/env python3
-"""Read and repair IDO .mdebug metadata for objdiff."""
+"""Recover IDO source names and line info for objdiff.
+
+IDO keeps local procedure names, static data names and source lines only in
+``.mdebug``; they never reach ``.symtab``.  Enabling ``-g``/``-g3`` is not an
+option because it changes code generation and breaks matching, so objdiff has
+to use the metadata that is already there.  Two IDO quirks block that:
+
+- ``objcopy --add-symbol`` (used to mirror target symbols) moves ``.mdebug``
+  but leaves the header offsets pointing at the old file positions;
+- objdiff expects ``ST_END.value`` to be an absolute end address, while IDO
+  stores the function size.
+
+This module reads the names and repairs both issues in place.  The result is
+that objdiff shows C/Pascal names and source lines on the base side instead of
+only ``func_...`` / ``D_...`` labels; target assembly has no debug info, so
+lines appear on the base side only.
+"""
 
 from __future__ import annotations
 
